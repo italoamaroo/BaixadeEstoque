@@ -13,7 +13,8 @@ import { QRCodeImage, qrDataUrl } from '@/components/QRCodeImage';
 import { useLookups } from '@/hooks/useLookups';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAuth } from '@/contexts/AuthContext';
-import { importMaterials, listMaterials, regenerateQr, saveMaterial } from '@/lib/api';
+import { importMaterials, listMaterials, regenerateQr, saveMaterial, withRetry } from '@/lib/api';
+import { fmtInt } from '@/lib/format';
 import { errorMessage } from '@/lib/errors';
 import { fieldErrors, materialSchema, type MaterialForm } from '@/lib/validation';
 import { parseImportFile, IMPORT_COLUMNS, downloadImportTemplate } from '@/lib/import';
@@ -391,10 +392,14 @@ function QrModal({ material, onClose, onChanged }: { material: Material | null; 
   );
 }
 
+type ImportResult = Awaited<ReturnType<typeof importMaterials>>;
+
 function ImportModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
   const [rows, setRows] = useState<Record<string, unknown>[] | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
-  const [result, setResult] = useState<Awaited<ReturnType<typeof importMaterials>> | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const [progress, setProgress] = useState('');
+  const [finished, setFinished] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -409,6 +414,7 @@ function ImportModal({ open, onClose, onDone }: { open: boolean; onClose: () => 
     if (!f) return;
     setFileError(null);
     setResult(null);
+    setFinished(false);
     try {
       const parsed = await parseImportFile(f);
       if (parsed.length === 0) throw new Error('Nenhuma linha encontrada no arquivo.');
@@ -420,17 +426,33 @@ function ImportModal({ open, onClose, onDone }: { open: boolean; onClose: () => 
   };
 
   const run = async () => {
-    if (!rows) return;
+    if (!rows || busy) return;
     setBusy(true);
+    setFileError(null);
+    // Planilhas grandes (ex.: 18 mil itens do ERP) são enviadas em lotes,
+    // para não estourar o limite por chamada nem o tempo máximo do banco.
+    const BATCH = 500;
+    const total: ImportResult = { inseridos: 0, atualizados: 0, erros: [] };
     try {
-      const r = await importMaterials(rows);
-      setResult(r);
-      toast.success(`${r.inseridos} inserido(s), ${r.atualizados} atualizado(s).`);
-      onDone();
+      for (let start = 0; start < rows.length; start += BATCH) {
+        setProgress(`Importando ${fmtInt(Math.min(start + BATCH, rows.length))} de ${fmtInt(rows.length)}…`);
+        const part = rows.slice(start, start + BATCH);
+        const r = await withRetry(() => importMaterials(part));
+        total.inseridos += r.inseridos;
+        total.atualizados += r.atualizados;
+        total.erros.push(...r.erros.map((e) => ({ ...e, linha: e.linha + start })));
+        setResult({ ...total, erros: [...total.erros] });
+      }
+      setFinished(true);
+      toast.success(`${fmtInt(total.inseridos)} inserido(s), ${fmtInt(total.atualizados)} atualizado(s).`);
     } catch (err) {
-      setFileError(errorMessage(err));
+      setFileError(
+        `${errorMessage(err)} Foram processadas ${fmtInt(total.inseridos + total.atualizados + total.erros.length)} linha(s) antes da falha; importe o arquivo de novo para concluir (os já importados serão apenas atualizados).`,
+      );
     } finally {
       setBusy(false);
+      setProgress('');
+      onDone();
     }
   };
 
@@ -447,8 +469,8 @@ function ImportModal({ open, onClose, onDone }: { open: boolean; onClose: () => 
           <Button variant="ghost" icon={<Download className="h-4 w-4" />} onClick={() => void downloadImportTemplate()}>
             Baixar modelo
           </Button>
-          <Button onClick={() => void run()} loading={busy} disabled={!rows || Boolean(result)}>
-            Importar {rows ? `${rows.length} linha(s)` : ''}
+          <Button onClick={() => void run()} loading={busy} disabled={!rows || finished}>
+            {busy && progress ? progress : `Importar ${rows ? `${fmtInt(rows.length)} linha(s)` : ''}`}
           </Button>
         </>
       }
@@ -486,10 +508,10 @@ function ImportModal({ open, onClose, onDone }: { open: boolean; onClose: () => 
           </div>
         )}
         {result && (
-          <Alert tone={result.erros.length ? 'warning' : 'success'} title={`${result.inseridos} inserido(s) · ${result.atualizados} atualizado(s) · ${result.erros.length} com erro`}>
+          <Alert tone={result.erros.length ? 'warning' : 'success'} title={`${fmtInt(result.inseridos)} inserido(s) · ${fmtInt(result.atualizados)} atualizado(s) · ${fmtInt(result.erros.length)} com erro`}>
             {result.erros.length > 0 && (
               <ul className="mt-1 max-h-40 list-disc overflow-auto pl-5">
-                {result.erros.map((e) => (
+                {result.erros.slice(0, 200).map((e) => (
                   <li key={e.linha}>
                     Linha {e.linha} ({e.codigo || 'sem código'}): {e.erro}
                   </li>
