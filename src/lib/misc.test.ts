@@ -73,3 +73,20 @@ describe('assinatura e permissões', () => {
     expect(can(['gestor'], 'cancelMovement')).toBe(true);
   });
 });
+
+describe('importação de planilha do ERP', () => {
+  it('acha o cabeçalho abaixo do título e usa descrição como nome', () => {
+    const rows = matrixToRows([
+      ['Relatório de produtos'],
+      [],
+      ['Cód. Produto', 'Descrição do Produto', 'UM', 'Endereço'],
+      ['OP34400710015D', 'Tampa da caixa', 'UN', ''],
+      ['', '', '', ''],
+    ]);
+    expect(rows).toEqual([{ code: 'OP34400710015D', name: 'Tampa da caixa', unit: 'UN', location: '' }]);
+  });
+  it('usa descrição como nome quando não há coluna nome', () => {
+    const rows = matrixToRows([['Código', 'Descrição', 'Unidade'], ['A1', 'Filtro', 'UN']]);
+    expect(rows[0]).toEqual({ code: 'A1', name: 'Filtro', unit: 'UN' });
+  });
+});

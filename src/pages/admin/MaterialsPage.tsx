@@ -143,7 +143,7 @@ export function MaterialsPage() {
         actions={
           <>
             <Button variant="secondary" icon={<Upload className="h-4 w-4" />} onClick={() => setImportOpen(true)}>
-              Importar
+              Importar planilha
             </Button>
             <Button
               variant="secondary"
@@ -441,7 +441,7 @@ function ImportModal({ open, onClose, onDone }: { open: boolean; onClose: () => 
       busy={busy}
       size="lg"
       title="Importar materiais"
-      description="Arquivo .xlsx ou .csv (separado por ; ou ,). Materiais com o mesmo código são atualizados."
+      description="Planilha .xlsx ou .csv. Código novo é incluído; código já cadastrado é atualizado (células vazias mantêm o valor atual)."
       footer={
         <>
           <Button variant="ghost" icon={<Download className="h-4 w-4" />} onClick={() => void downloadImportTemplate()}>
@@ -455,9 +455,9 @@ function ImportModal({ open, onClose, onDone }: { open: boolean; onClose: () => 
     >
       <div className="space-y-4">
         <p className="text-sm text-slate-600">
-          Colunas aceitas: {IMPORT_COLUMNS.map((c) => <code key={c.key} className="mx-0.5 rounded bg-slate-100 px-1 text-xs">{c.header}</code>)}. Obrigatórias: código, nome e unidade.
+          Colunas aceitas: {IMPORT_COLUMNS.map((c) => <code key={c.key} className="mx-0.5 rounded bg-slate-100 px-1 text-xs">{c.header}</code>)}. Obrigatórias: código, nome (ou descrição) e unidade. Nomes de coluna comuns de ERP também são reconhecidos (ex.: "Cód. Produto", "Descrição do Produto", "UM", "Endereço"), mesmo com título acima do cabeçalho.
         </p>
-        <input type="file" accept=".xlsx,.csv,text/csv" onChange={(e) => void onFile(e.target.files?.[0])} className="block w-full text-sm" />
+        <input type="file" accept=".xlsx,.xls,.csv,text/csv" onChange={(e) => void onFile(e.target.files?.[0])} className="block w-full text-sm" />
         {fileError && <Alert tone="error">{fileError}</Alert>}
         {rows && !result && (
           <div className="max-h-56 overflow-auto rounded border border-slate-200 text-xs">

@@ -19,12 +19,18 @@ const sizes = { sm: 'sm:max-w-md', md: 'sm:max-w-lg', lg: 'sm:max-w-2xl', xl: 's
 
 export function Modal({ open, onClose, title, description, children, footer, size = 'md', busy }: ModalProps) {
   const panel = useRef<HTMLDivElement>(null);
+  // Guarda as funções mais recentes sem reexecutar o efeito a cada digitação
+  // (antes, o foco voltava para o primeiro campo sempre que a tela re-renderizava).
+  const onCloseRef = useRef(onClose);
+  const busyRef = useRef(busy);
+  onCloseRef.current = onClose;
+  busyRef.current = busy;
 
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !busy) onClose();
+      if (e.key === 'Escape' && !busyRef.current) onCloseRef.current();
     };
     document.addEventListener('keydown', onKey);
     const t = setTimeout(() => {
@@ -38,7 +44,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
       document.body.style.overflow = '';
       prev?.focus?.();
     };
-  }, [open, onClose, busy]);
+  }, [open]);
 
   if (!open) return null;
   return createPortal(
