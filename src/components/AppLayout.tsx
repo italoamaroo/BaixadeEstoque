@@ -37,7 +37,7 @@ const OPERATION: NavItem[] = [
   { to: '/nova-saida', label: 'Nova saída', icon: <PackageMinus className="h-5 w-5" />, perm: 'createMovement' },
   { to: '/movimentacoes', label: 'Movimentações', icon: <ClipboardList className="h-5 w-5" /> },
   { to: '/pendencias-sa', label: 'Pendências de SA', icon: <Hourglass className="h-5 w-5" />, perm: 'informSa' },
-  { to: '/exportar', label: 'Exportar Excel', icon: <FileSpreadsheet className="h-5 w-5" />, perm: 'exportExcel' },
+  { to: '/exportar', label: 'Exportar Excel/PDF', icon: <FileSpreadsheet className="h-5 w-5" />, perm: 'exportExcel' },
 ];
 
 const REGISTRY: NavItem[] = [

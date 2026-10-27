@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Download, FileSpreadsheet, ListTree, Rows3 } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, ListTree, Rows3 } from 'lucide-react';
 import { toast } from 'sonner';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,17 +9,20 @@ import { Button } from '@/components/ui/Button';
 import { Alert, Card, CardHeader, PageHeader } from '@/components/ui/Card';
 import { exportMovements, logEvent, searchMovements } from '@/lib/api';
 import { buildWorkbook, downloadBlob, type ExportKind } from '@/lib/excel';
+import { buildMovementsPdf, fetchPdfData, PDF_LIMIT } from '@/lib/pdfReport';
 import { errorMessage } from '@/lib/errors';
 import { describeFilters, exportFileName, filtersFromSearchParams, filtersToSearchParams, toRpcFilters } from '@/lib/filters';
 import { fmtInt } from '@/lib/format';
 
 export function ExportPage() {
-  const { warehouses, displayName } = useAuth();
+  const { warehouses, displayName, settings } = useAuth();
   const [params, setParams] = useSearchParams();
   const filters = useMemo(() => filtersFromSearchParams(params), [params]);
   const [kind, setKind] = useState<ExportKind>('resumo');
   const [count, setCount] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -57,9 +60,40 @@ export function ExportPage() {
     }
   };
 
+  const runPdf = async () => {
+    if (pdfBusy) return;
+    setPdfBusy(true);
+    setError(null);
+    try {
+      const data = await fetchPdfData(filters, setPdfProgress);
+      if (data.rows.length === 0) {
+        toast.info('Nenhuma ME para gerar o PDF com os filtros atuais.');
+        return;
+      }
+      setPdfProgress('Montando o PDF…');
+      const blob = await buildMovementsPdf(data.rows, {
+        filterLines: lines,
+        generatedBy: displayName,
+        companyName: settings?.company_name ?? '',
+        total: data.total,
+        truncated: data.truncated,
+      });
+      const pdfName = fileName.replace(/(_itens)?\.xlsx$/, '_com_assinaturas.pdf');
+      downloadBlob(blob, pdfName);
+      void logEvent('me.pdf_gerado', null, { relatorio: true, mes: data.rows.length, filtros: toRpcFilters(filters), arquivo: pdfName });
+      toast.success(`PDF gerado com ${fmtInt(data.rows.length)} ME(s).`);
+      if (data.truncated) toast.warning(`Foram incluídas as primeiras ${PDF_LIMIT} MEs. Refine os filtros para gerar o restante.`);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setPdfBusy(false);
+      setPdfProgress('');
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <PageHeader title="Exportar para Excel" subtitle="Os dados vêm direto do Supabase e respeitam exatamente os filtros abaixo." />
+      <PageHeader title="Exportar Excel e PDF" subtitle="Os dados vêm direto do Supabase e respeitam exatamente os filtros abaixo." />
       <FiltersPanel value={filters} onApply={(f) => setParams(filtersToSearchParams(f), { replace: true })} defaultOpen />
 
       <Card>
@@ -110,8 +144,23 @@ export function ExportPage() {
           </div>
         )}
         <div className="mt-5 flex justify-end">
-          <Button size="lg" variant="success" icon={<Download className="h-5 w-5" />} loading={busy} onClick={() => void run()} disabled={count === 0}>
+          <Button size="lg" variant="success" icon={<Download className="h-5 w-5" />} loading={busy} onClick={() => void run()} disabled={count === 0 || pdfBusy}>
             Gerar Excel
+          </Button>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="PDF com itens e assinaturas"
+          subtitle={`Uma página por ME com cabeçalho, materiais e a assinatura digital de quem recebeu. Usa os mesmos filtros acima (até ${PDF_LIMIT} MEs por arquivo).`}
+        />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate-600">
+            {pdfBusy ? pdfProgress : <>MEs no PDF: <strong>{count === null ? '…' : fmtInt(Math.min(count, PDF_LIMIT))}</strong></>}
+          </p>
+          <Button size="lg" icon={<FileText className="h-5 w-5" />} loading={pdfBusy} onClick={() => void runPdf()} disabled={count === 0 || busy}>
+            Gerar PDF
           </Button>
         </div>
       </Card>
