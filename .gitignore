@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+coverage
+supabase/.temp
+tests/e2e/capturas
+tests/e2e/.arquivos
+supabase/instalar_completo.sql.bak
