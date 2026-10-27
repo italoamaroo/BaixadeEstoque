@@ -156,10 +156,18 @@ begin
               nullif(btrim(v_row ->> 'description'), ''), btrim(v_row ->> 'unit'),
               nullif(btrim(v_row ->> 'location'), ''), v_account, v_category, v_wh,
               coalesce((v_row ->> 'active')::boolean, true))
+      -- Atualização: só sobrescreve com valores preenchidos na planilha.
+      -- Células vazias (ou colunas ausentes) mantêm o que já está cadastrado.
       on conflict (code) do update set
-        reference = excluded.reference, name = excluded.name, description = excluded.description,
-        unit = excluded.unit, location = excluded.location, account_id = excluded.account_id,
-        category_id = excluded.category_id, warehouse_id = excluded.warehouse_id, active = excluded.active;
+        reference    = coalesce(excluded.reference, materials.reference),
+        name         = excluded.name,
+        description  = coalesce(excluded.description, materials.description),
+        unit         = excluded.unit,
+        location     = coalesce(excluded.location, materials.location),
+        account_id   = coalesce(excluded.account_id, materials.account_id),
+        category_id  = coalesce(excluded.category_id, materials.category_id),
+        warehouse_id = coalesce(excluded.warehouse_id, materials.warehouse_id),
+        active       = case when v_row ? 'active' then excluded.active else materials.active end;
 
       if v_exists then v_updated := v_updated + 1; else v_inserted := v_inserted + 1; end if;
     exception when others then
