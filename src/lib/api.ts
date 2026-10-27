@@ -297,6 +297,11 @@ export const importMaterials = (rows: Record<string, unknown>[]) =>
     p_rows: rows,
   });
 
+export const importEmployees = (rows: Record<string, unknown>[]) =>
+  rpc<{ inseridos: number; atualizados: number; erros: { linha: number; codigo: string; erro: string }[] }>('import_employees', {
+    p_rows: rows,
+  });
+
 // ---------------------------------------------------------------------------
 // Usuários, perfis e parâmetros
 // ---------------------------------------------------------------------------
