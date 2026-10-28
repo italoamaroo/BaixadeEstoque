@@ -90,7 +90,13 @@ export function LabelsPage() {
     const el = document.createElement('style');
     el.setAttribute('data-labels-page', '');
     el.textContent = s.thermal
-      ? `@media print { @page { size: ${s.w} ${s.h}; margin: 0; } html, body { margin: 0 !important; padding: 0 !important; } }`
+      ? `@media print {
+          @page { size: ${s.w} ${s.h}; margin: 0; }
+          html, body { margin: 0 !important; padding: 0 !important; width: ${s.w}; }
+          /* etiqueta um pouco menor que a página para nunca "vazar" para uma segunda página */
+          .labels-sheet > div { height: calc(${s.h} - 0.6mm) !important; break-inside: avoid; page-break-inside: avoid; }
+          [data-sonner-toaster] { display: none !important; }
+        }`
       : '@media print { @page { size: A4 portrait; margin: 8mm; } }';
     document.head.appendChild(el);
     return () => el.remove();
