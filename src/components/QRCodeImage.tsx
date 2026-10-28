@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import QRCode from 'qrcode';
 
 /** Gera o QR Code no navegador. O conteúdo é somente o identificador do material. */
-export function QRCodeImage({ value, size = 160, className }: { value: string; size?: number; className?: string }) {
+export function QRCodeImage({ value, size = 160, className, style }: { value: string; size?: number; className?: string; style?: CSSProperties }) {
   const [src, setSrc] = useState<string>('');
   useEffect(() => {
     let alive = true;
@@ -13,8 +13,8 @@ export function QRCodeImage({ value, size = 160, className }: { value: string; s
       alive = false;
     };
   }, [value, size]);
-  if (!src) return <div style={{ width: size, height: size }} className="animate-pulse rounded bg-slate-100" />;
-  return <img src={src} width={size} height={size} alt={`QR Code ${value}`} className={className} />;
+  if (!src) return <div style={style ?? { width: size, height: size }} className="animate-pulse rounded bg-slate-100" />;
+  return <img src={src} width={size} height={size} alt={`QR Code ${value}`} className={className} style={style} />;
 }
 
 export async function qrDataUrl(value: string, size = 600): Promise<string> {
