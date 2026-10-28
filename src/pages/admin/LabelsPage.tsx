@@ -24,8 +24,8 @@ interface LabelSize {
 
 const SIZES = {
   termica7025: {
-    label: 'Térmica 70 × 25 mm (Elgin L42 Pro)',
-    w: '70mm',
+    label: 'Térmica 67,5 × 25 mm (Elgin L42 Pro)',
+    w: '67.5mm',
     h: '25mm',
     qr: 220,
     font: 'text-[8pt]',
@@ -174,7 +174,7 @@ export function LabelsPage() {
                       <li>Margens: <strong>Nenhuma</strong> · Escala: <strong>100%</strong> (ou “Padrão”)</li>
                       <li>Desmarque “Cabeçalhos e rodapés”</li>
                       <li>
-                        No driver da impressora (Preferências de impressão), deixe o papel em <strong>70 × 25 mm</strong> e o tipo de mídia
+                        No driver da impressora (Preferências de impressão), deixe o papel em <strong>67,5 × 25 mm</strong> e o tipo de mídia
                         como <strong>etiqueta com gap</strong>.
                       </li>
                     </ul>
