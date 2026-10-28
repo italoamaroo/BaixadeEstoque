@@ -105,6 +105,7 @@ export function MovementDetailPage() {
   const [tab, setTab] = useState<'itens' | 'historico'>('itens');
   const [modal, setModal] = useState<null | 'sa' | 'cancel' | 'approve' | 'correct' | 'signature'>(null);
   const [busy, setBusy] = useState(false);
+  const [cancelType, setCancelType] = useState('Devolução do material');
   const [printSigUrl, setPrintSigUrl] = useState<string | null>(null);
   const wantsPrint = params.get('imprimir') === '1';
   const auditAllowed = can('viewAudit');
@@ -165,6 +166,9 @@ export function MovementDetailPage() {
 
   const m = detail.movement;
   const isCancelled = m.status === 'cancelada';
+  const beforeSa = m.status === 'aguardando_sa' || m.status === 'aguardando_aprovacao';
+  // Almoxarife cancela (devolução) só antes do lançamento no ERP; gestor/admin em qualquer status.
+  const canCancel = !isCancelled && (can('cancelMovement') || (can('cancelBeforeSa') && beforeSa));
 
   const runAction = async (fn: () => Promise<unknown>, success: string) => {
     if (busy) return;
@@ -274,7 +278,7 @@ export function MovementDetailPage() {
                   Corrigir
                 </Button>
               )}
-              {!isCancelled && can('cancelMovement') && (
+              {canCancel && (
                 <Button variant="danger" icon={<Ban className="h-4 w-4" />} onClick={() => setModal('cancel')}>
                   Cancelar ME
                 </Button>
@@ -434,13 +438,29 @@ export function MovementDetailPage() {
       <JustificationModal
         open={modal === 'cancel'}
         title={`Cancelar ${m.me_number}?`}
-        description="O cancelamento é lógico: materiais, assinatura, SA e histórico são preservados."
+        description="O cancelamento é lógico: materiais, assinatura, SA e histórico são preservados. Use para devolução de material ou lançamento incorreto."
         confirmLabel="Cancelar ME"
         tone="danger"
         busy={busy}
         onClose={() => setModal(null)}
-        onConfirm={(j) => runAction(() => cancelMovement(m.id, j), `${m.me_number} cancelada.`)}
-      />
+        onConfirm={(j) => runAction(() => cancelMovement(m.id, `${cancelType}: ${j}`), `${m.me_number} cancelada.`)}
+      >
+        <label className="block text-sm font-medium text-slate-700">
+          Motivo
+          <select
+            className="mt-1.5 block h-10 w-full rounded-lg border-0 px-3 text-sm ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-brand-600"
+            value={cancelType}
+            onChange={(e) => setCancelType(e.target.value)}
+          >
+            <option>Devolução do material</option>
+            <option>Lançamento incorreto</option>
+            <option>Outro</option>
+          </select>
+        </label>
+        {!can('cancelMovement') && (
+          <p className="text-xs text-slate-500">Como almoxarife, você só pode cancelar MEs que ainda não tiveram SA lançada no ERP.</p>
+        )}
+      </JustificationModal>
       <JustificationModal
         open={modal === 'approve'}
         title={`Aprovar ${m.me_number}?`}

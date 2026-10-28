@@ -51,6 +51,7 @@ export const PERMISSIONS = {
   correctSaAfterCompletion: ['gestor', 'admin'],
   approveMovement: ['gestor', 'admin'],
   cancelMovement: ['gestor', 'admin'],
+  cancelBeforeSa: ['almoxarife', 'gestor', 'admin'],
   correctMovement: ['gestor', 'admin'],
   replaceSignature: ['gestor', 'admin'],
   exportExcel: ['equipe_sa', 'gestor', 'admin'],
