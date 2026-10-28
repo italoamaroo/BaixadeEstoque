@@ -10,18 +10,60 @@ import { QRCodeImage } from '@/components/QRCodeImage';
 import { getMaterialsByIds, markLabelsPrinted } from '@/lib/api';
 import type { Material } from '@/types/db';
 
+interface LabelSize {
+  label: string;
+  w: string;
+  h: string;
+  qr: number;
+  font: string;
+  /** impressora térmica: 1 etiqueta por página, página do tamanho exato da etiqueta */
+  thermal?: boolean;
+  qrMm?: string;
+  nameLines?: string;
+}
+
 const SIZES = {
-  pequena: { label: 'Pequena (50 × 30 mm)', w: '50mm', h: '30mm', qr: 80, font: 'text-[8px]' },
-  media: { label: 'Média (70 × 40 mm)', w: '70mm', h: '40mm', qr: 110, font: 'text-[10px]' },
-  grande: { label: 'Grande (100 × 60 mm)', w: '100mm', h: '60mm', qr: 170, font: 'text-[12px]' },
-} as const;
+  termica7025: {
+    label: 'Térmica 70 × 25 mm (Elgin L42 Pro)',
+    w: '70mm',
+    h: '25mm',
+    qr: 220,
+    font: 'text-[8pt]',
+    thermal: true,
+    qrMm: '21mm',
+    // nome maior e em até 3 linhas para ocupar a área livre da etiqueta
+    nameLines: 'line-clamp-3 leading-[1.1]',
+  },
+  pequena: { label: 'Folha A4 – pequena (50 × 30 mm)', w: '50mm', h: '30mm', qr: 80, font: 'text-[8px]' },
+  media: { label: 'Folha A4 – média (70 × 40 mm)', w: '70mm', h: '40mm', qr: 110, font: 'text-[10px]' },
+  grande: { label: 'Folha A4 – grande (100 × 60 mm)', w: '100mm', h: '60mm', qr: 170, font: 'text-[12px]' },
+} satisfies Record<string, LabelSize>;
 
 type SizeKey = keyof typeof SIZES;
+const SIZE_KEY = 'baixas-estoque:etiqueta-tamanho';
+
+function loadSize(): SizeKey {
+  try {
+    const v = localStorage.getItem(SIZE_KEY);
+    if (v && v in SIZES) return v as SizeKey;
+  } catch {
+    /* ignore */
+  }
+  return 'termica7025';
+}
 
 export function LabelsPage() {
   const [params] = useSearchParams();
   const [items, setItems] = useState<{ material: Material; copies: number }[]>([]);
-  const [size, setSize] = useState<SizeKey>('media');
+  const [size, setSizeState] = useState<SizeKey>(loadSize);
+  const setSize = (k: SizeKey) => {
+    setSizeState(k);
+    try {
+      localStorage.setItem(SIZE_KEY, k);
+    } catch {
+      /* ignore */
+    }
+  };
   const [showLocation, setShowLocation] = useState(true);
 
   useEffect(() => {
@@ -41,7 +83,18 @@ export function LabelsPage() {
     window.print();
   };
 
-  const s = SIZES[size];
+  const s: LabelSize = SIZES[size];
+
+  // Na térmica, a página de impressão tem exatamente o tamanho da etiqueta e sem margens.
+  useEffect(() => {
+    const el = document.createElement('style');
+    el.setAttribute('data-labels-page', '');
+    el.textContent = s.thermal
+      ? `@media print { @page { size: ${s.w} ${s.h}; margin: 0; } html, body { margin: 0 !important; padding: 0 !important; } }`
+      : '@media print { @page { size: A4 portrait; margin: 8mm; } }';
+    document.head.appendChild(el);
+    return () => el.remove();
+  }, [s.thermal, s.w, s.h]);
   const labels = items.flatMap((i) => Array.from({ length: i.copies }, (_, n) => ({ ...i, n })));
 
   return (
@@ -113,6 +166,21 @@ export function LabelsPage() {
                   ))}
                 </Select>
                 <Checkbox label="Mostrar localização" checked={showLocation} onChange={setShowLocation} />
+                {s.thermal && (
+                  <div className="rounded-lg bg-brand-50 p-3 text-xs text-brand-900">
+                    <p className="font-semibold">Na janela de impressão do navegador:</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      <li>Destino: <strong>Elgin L42 Pro</strong></li>
+                      <li>Margens: <strong>Nenhuma</strong> · Escala: <strong>100%</strong> (ou “Padrão”)</li>
+                      <li>Desmarque “Cabeçalhos e rodapés”</li>
+                      <li>
+                        No driver da impressora (Preferências de impressão), deixe o papel em <strong>70 × 25 mm</strong> e o tipo de mídia
+                        como <strong>etiqueta com gap</strong>.
+                      </li>
+                    </ul>
+                    <p className="mt-1">Cada etiqueta sai em uma página; as cópias saem em sequência.</p>
+                  </div>
+                )}
               </div>
             </Card>
             <Card>
@@ -126,20 +194,48 @@ export function LabelsPage() {
         )}
       </div>
 
-      <div className="labels-sheet flex flex-wrap gap-[3mm] print:gap-[2mm]">
-        {labels.map(({ material: m, n }) => (
+      <div
+        className={clsx(
+          'labels-sheet flex flex-wrap',
+          s.thermal ? 'gap-[3mm] print:block print:gap-0' : 'gap-[3mm] print:gap-[2mm]',
+        )}
+      >
+        {labels.map(({ material: m, n }, idx) => (
           <div
             key={`${m.id}-${n}`}
             style={{ width: s.w, height: s.h }}
-            className={clsx('flex items-center gap-[2mm] overflow-hidden rounded border border-slate-400 bg-white p-[2mm] text-black [break-inside:avoid]', s.font)}
+            className={clsx(
+              'flex items-center overflow-hidden bg-white text-black',
+              s.font,
+              s.thermal
+                ? clsx(
+                    'gap-[1.5mm] rounded-sm border border-slate-400 px-[1.5mm] py-[1mm] print:rounded-none print:border-0',
+                    idx < labels.length - 1 && 'print:[break-after:page]',
+                  )
+                : 'gap-[2mm] rounded border border-slate-400 p-[2mm] [break-inside:avoid]',
+            )}
           >
-            <QRCodeImage value={m.qr_code} size={s.qr} className="h-full w-auto shrink-0" />
-            <div className="min-w-0 leading-tight">
-              <p className="font-mono font-bold">{m.code}</p>
+            <QRCodeImage
+              value={m.qr_code}
+              size={s.qr}
+              className={clsx('shrink-0 [image-rendering:pixelated]', !s.qrMm && 'h-full w-auto')}
+              style={s.qrMm ? { width: s.qrMm, height: s.qrMm } : undefined}
+            />
+            <div className={clsx('min-w-0 flex-1', s.thermal ? 'flex h-full flex-col justify-center gap-[0.4mm] leading-[1.1]' : 'leading-[1.15]')}>
+              <p className="truncate font-mono font-bold">{m.code}</p>
               {m.reference && <p className="truncate">Ref. {m.reference}</p>}
-              <p className="line-clamp-3 font-semibold">{m.name}</p>
-              <p>Unid.: {m.unit}</p>
-              {showLocation && m.location && <p>Loc.: {m.location}</p>}
+              <p
+                className={clsx('font-semibold', s.nameLines ?? 'line-clamp-3')}
+                // térmica: nomes curtos ficam maiores para preencher a etiqueta
+                style={s.thermal ? { fontSize: m.name.length <= 22 ? '12pt' : m.name.length <= 40 ? '11pt' : '10pt' } : undefined}
+              >
+                {m.name}
+              </p>
+              <p className="truncate">
+                Unid.: {m.unit}
+                {s.thermal && showLocation && m.location ? ` · Loc.: ${m.location}` : ''}
+              </p>
+              {!s.thermal && showLocation && m.location && <p>Loc.: {m.location}</p>}
             </div>
           </div>
         ))}
