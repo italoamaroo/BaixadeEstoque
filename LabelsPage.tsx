@@ -38,8 +38,8 @@ const SIZES = {
     font: 'text-[8pt]',
     thermal: true,
     qrMm: '21mm',
-    // nome maior e em até 3 linhas para ocupar a área livre da etiqueta
-    nameLines: 'line-clamp-3 leading-[1.1]',
+    // código em destaque (14pt) e nome em até 2 linhas
+    nameLines: 'line-clamp-2 leading-[1.1]',
   },
   pequena: { label: 'Folha A4 – pequena (50 × 30 mm)', w: '50mm', h: '30mm', qr: 80, font: 'text-[8px]' },
   media: { label: 'Folha A4 – média (70 × 40 mm)', w: '70mm', h: '40mm', qr: 110, font: 'text-[10px]' },
@@ -47,8 +47,10 @@ const SIZES = {
 } satisfies Record<string, LabelSize>;
 
 type SizeKey = keyof typeof SIZES;
-/** limite por impressão, para o navegador não travar */
-const MAX_LABELS = 1000;
+/** etiquetas por lote de impressão, para o navegador e a impressora não travarem */
+const BATCH_SIZE = 300;
+/** limite total da lista */
+const MAX_LABELS = 10000;
 const SIZE_KEY = 'baixas-estoque:etiqueta-tamanho';
 
 function loadSize(): SizeKey {
@@ -76,6 +78,7 @@ export function LabelsPage() {
   const [showLocation, setShowLocation] = useState(true);
   const [importOpen, setImportOpen] = useState(false);
   const [preparing, setPreparing] = useState(false);
+  const [batch, setBatch] = useState(0);
 
   useEffect(() => {
     const ids = (params.get('ids') ?? '').split(',').filter(Boolean);
@@ -91,22 +94,29 @@ export function LabelsPage() {
 
   const print = async () => {
     if (labels.length > MAX_LABELS) {
-      toast.error(`Imprima no máximo ${fmtInt(MAX_LABELS)} etiquetas por vez. Reduza as cópias ou remova itens.`);
+      toast.error(`A lista tem mais de ${fmtInt(MAX_LABELS)} etiquetas. Reduza as cópias ou remova itens.`);
       return;
     }
-    // espera todos os QR Codes serem gerados antes de abrir a impressão
+    // espera todos os QR Codes do lote serem gerados antes de abrir a impressão
     setPreparing(true);
     const start = Date.now();
-    while (document.querySelectorAll('.labels-sheet img').length < labels.length && Date.now() - start < 20000) {
+    while (document.querySelectorAll('.labels-sheet img').length < batchLabels.length && Date.now() - start < 30000) {
       await new Promise((r) => setTimeout(r, 150));
     }
     setPreparing(false);
-    void markLabelsPrinted(items.map((i) => i.material.id));
+    void markLabelsPrinted([...new Set(batchLabels.map((l) => l.material.id))]);
     window.print();
+    if (batchCount > 1 && batch < batchCount - 1) {
+      toast.success(`Lote ${batch + 1} de ${batchCount} enviado. Clique em Imprimir para o lote ${batch + 2}.`);
+      setBatch(batch + 1);
+    } else if (batchCount > 1) {
+      toast.success('Todos os lotes foram enviados para impressão.');
+    }
   };
 
   /** Inclui na lista os materiais vindos da planilha (somando cópias de quem já estava). */
   const addFromSheet = (list: { material: Material; copies: number }[], replace: boolean) => {
+    setBatch(0);
     setItems((current) => {
       const base = replace ? [] : [...current];
       for (const it of list) {
@@ -137,6 +147,10 @@ export function LabelsPage() {
     return () => el.remove();
   }, [s.thermal, s.w, s.h]);
   const labels = items.flatMap((i) => Array.from({ length: i.copies }, (_, n) => ({ ...i, n })));
+  const batchCount = Math.max(1, Math.ceil(labels.length / BATCH_SIZE));
+  const currentBatch = Math.min(batch, batchCount - 1);
+  const batchLabels = labels.slice(currentBatch * BATCH_SIZE, (currentBatch + 1) * BATCH_SIZE);
+  const batchRange = (b: number) => `${fmtInt(b * BATCH_SIZE + 1)} a ${fmtInt(Math.min((b + 1) * BATCH_SIZE, labels.length))}`;
 
   return (
     <div>
@@ -150,12 +164,16 @@ export function LabelsPage() {
                 Importar planilha
               </Button>
               {items.length > 0 && (
-                <Button variant="ghost" icon={<Trash2 className="h-4 w-4" />} onClick={() => setItems([])}>
+                <Button variant="ghost" icon={<Trash2 className="h-4 w-4" />} onClick={() => { setItems([]); setBatch(0); }}>
                   Limpar lista
                 </Button>
               )}
               <Button icon={<Printer className="h-4 w-4" />} onClick={() => void print()} disabled={items.length === 0} loading={preparing}>
-                {preparing ? 'Preparando…' : `Imprimir ${fmtInt(labels.length)} etiqueta(s)`}
+                {preparing
+                  ? 'Preparando…'
+                  : batchCount > 1
+                    ? `Imprimir lote ${currentBatch + 1} de ${batchCount} (${fmtInt(batchLabels.length)})`
+                    : `Imprimir ${fmtInt(labels.length)} etiqueta(s)`}
               </Button>
             </>
           }
@@ -169,8 +187,25 @@ export function LabelsPage() {
             {labels.length > MAX_LABELS && (
               <div className="mb-3">
                 <Alert tone="warning">
-                  São {fmtInt(labels.length)} etiquetas. Imprima no máximo {fmtInt(MAX_LABELS)} por vez: reduza as cópias ou divida a planilha.
+                  São {fmtInt(labels.length)} etiquetas. O máximo da lista é {fmtInt(MAX_LABELS)}: reduza as cópias ou divida a planilha.
                 </Alert>
+              </div>
+            )}
+            {batchCount > 1 && labels.length <= MAX_LABELS && (
+              <div className="mb-3 rounded-lg bg-brand-50 p-3 text-sm text-brand-900">
+                <p>
+                  São <strong>{fmtInt(labels.length)}</strong> etiquetas, impressas em <strong>{batchCount} lotes</strong> de até{' '}
+                  {fmtInt(BATCH_SIZE)}. Depois de cada impressão o próximo lote é selecionado automaticamente.
+                </p>
+                <div className="mt-2 max-w-xs">
+                  <Select label="Lote a imprimir" value={String(currentBatch)} onChange={(e) => setBatch(Number(e.target.value))}>
+                    {Array.from({ length: batchCount }, (_, b) => (
+                      <option key={b} value={b}>
+                        Lote {b + 1} – etiquetas {batchRange(b)}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
               </div>
             )}
             {items.length === 0 ? (
@@ -251,7 +286,9 @@ export function LabelsPage() {
           </div>
         </div>
         {labels.length > 0 && (
-          <h3 className="mb-2 mt-6 text-sm font-semibold text-slate-700">Pré-visualização</h3>
+          <h3 className="mb-2 mt-6 text-sm font-semibold text-slate-700">
+            Pré-visualização{batchCount > 1 ? ` – lote ${currentBatch + 1} (etiquetas ${batchRange(currentBatch)})` : ''}
+          </h3>
         )}
       </div>
 
@@ -261,7 +298,7 @@ export function LabelsPage() {
           s.thermal ? 'gap-[3mm] print:block print:gap-0' : 'gap-[3mm] print:gap-[2mm]',
         )}
       >
-        {labels.map(({ material: m, n }, idx) => (
+        {batchLabels.map(({ material: m, n }, idx) => (
           <div
             key={`${m.id}-${n}`}
             style={{ width: s.w, height: s.h }}
@@ -271,7 +308,7 @@ export function LabelsPage() {
               s.thermal
                 ? clsx(
                     'gap-[1.5mm] rounded-sm border border-slate-400 px-[1.5mm] py-[1mm] print:rounded-none print:border-0',
-                    idx < labels.length - 1 && 'print:[break-after:page]',
+                    idx < batchLabels.length - 1 && 'print:[break-after:page]',
                   )
                 : 'gap-[2mm] rounded border border-slate-400 p-[2mm] [break-inside:avoid]',
             )}
@@ -283,7 +320,13 @@ export function LabelsPage() {
               style={s.qrMm ? { width: s.qrMm, height: s.qrMm } : undefined}
             />
             <div className={clsx('min-w-0 flex-1', s.thermal ? 'flex h-full flex-col justify-center gap-[0.4mm] leading-[1.1]' : 'leading-[1.15]')}>
-              <p className="truncate font-mono font-bold">{m.code}</p>
+              <p
+                className="truncate font-mono font-bold"
+                // térmica: código em 14pt; códigos com mais de 12 caracteres em 12pt para caber na largura
+                style={s.thermal ? { fontSize: m.code.length <= 12 ? '14pt' : '12pt', lineHeight: 1.05 } : undefined}
+              >
+                {m.code}
+              </p>
               {m.reference && <p className="truncate">Ref. {m.reference}</p>}
               <p
                 className={clsx('font-semibold', s.nameLines ?? 'line-clamp-3')}
@@ -478,7 +521,7 @@ function ImportLabelsModal({
             </div>
             <p className="text-sm text-slate-700">
               Etiquetas a gerar: <strong>{fmtInt(totalLabels)}</strong>
-              {totalLabels > MAX_LABELS && <span className="text-orange-700"> · acima de {fmtInt(MAX_LABELS)}, imprima em partes</span>}
+              {totalLabels > BATCH_SIZE && <span className="text-orange-700"> · será impresso em lotes de {fmtInt(BATCH_SIZE)}</span>}
             </p>
             {analysis.missing.length > 0 && (
               <Alert tone="warning" title={`${fmtInt(analysis.missing.length)} código(s) não estão cadastrados`}>
