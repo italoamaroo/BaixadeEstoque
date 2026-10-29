@@ -38,8 +38,8 @@ const SIZES = {
     font: 'text-[8pt]',
     thermal: true,
     qrMm: '21mm',
-    // nome maior e em até 3 linhas para ocupar a área livre da etiqueta
-    nameLines: 'line-clamp-3 leading-[1.1]',
+    // código em destaque (14pt) e nome em até 2 linhas
+    nameLines: 'line-clamp-2 leading-[1.1]',
   },
   pequena: { label: 'Folha A4 – pequena (50 × 30 mm)', w: '50mm', h: '30mm', qr: 80, font: 'text-[8px]' },
   media: { label: 'Folha A4 – média (70 × 40 mm)', w: '70mm', h: '40mm', qr: 110, font: 'text-[10px]' },
@@ -320,7 +320,13 @@ export function LabelsPage() {
               style={s.qrMm ? { width: s.qrMm, height: s.qrMm } : undefined}
             />
             <div className={clsx('min-w-0 flex-1', s.thermal ? 'flex h-full flex-col justify-center gap-[0.4mm] leading-[1.1]' : 'leading-[1.15]')}>
-              <p className="truncate font-mono font-bold">{m.code}</p>
+              <p
+                className="truncate font-mono font-bold"
+                // térmica: código em 14pt; códigos com mais de 12 caracteres em 12pt para caber na largura
+                style={s.thermal ? { fontSize: m.code.length <= 12 ? '14pt' : '12pt', lineHeight: 1.05 } : undefined}
+              >
+                {m.code}
+              </p>
               {m.reference && <p className="truncate">Ref. {m.reference}</p>}
               <p
                 className={clsx('font-semibold', s.nameLines ?? 'line-clamp-3')}
