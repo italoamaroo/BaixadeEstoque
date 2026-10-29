@@ -64,8 +64,8 @@ as $$
 declare
   v_qr text := public.generate_qr_value();
 begin
-  if not public.is_admin() then
-    raise exception 'Somente administrador pode gerar um novo QR Code.' using errcode = '42501';
+  if not public.can_manage_master_data() then
+    raise exception 'Somente administrador ou almoxarife pode gerar um novo QR Code.' using errcode = '42501';
   end if;
   update public.materials set qr_code = v_qr where id = p_material_id;
   if not found then
@@ -114,8 +114,8 @@ declare
   v_code      text;
   v_exists    boolean;
 begin
-  if not public.is_admin() then
-    raise exception 'Somente administrador pode importar materiais.' using errcode = '42501';
+  if not public.can_manage_master_data() then
+    raise exception 'Somente administrador ou almoxarife pode importar materiais.' using errcode = '42501';
   end if;
   if jsonb_typeof(p_rows) <> 'array' then
     raise exception 'Formato de importação inválido.' using errcode = '22023';
@@ -466,8 +466,8 @@ declare
   v_sector_id uuid;
   v_exists    boolean;
 begin
-  if not public.is_admin() then
-    raise exception 'Somente administrador pode importar funcionários.' using errcode = '42501';
+  if not public.can_manage_master_data() then
+    raise exception 'Somente administrador ou almoxarife pode importar funcionários.' using errcode = '42501';
   end if;
   if jsonb_typeof(p_rows) <> 'array' then
     raise exception 'Formato de importação inválido.' using errcode = '22023';

@@ -64,7 +64,7 @@ create policy app_settings_select on public.app_settings
 
 -- ---------------------------------------------------------------------
 -- Cadastros auxiliares, funcionários e materiais
--- Leitura: usuários ativos. Inclusão/alteração: administrador.
+-- Leitura: usuários ativos. Inclusão/alteração: administrador e almoxarife.
 -- Não há DELETE: utilize o campo "active" (inativação).
 -- ---------------------------------------------------------------------
 do $$
@@ -77,9 +77,9 @@ begin
   ] loop
     execute format('create policy %I on public.%I for select to authenticated using (public.is_active_user())',
                    t || '_select', t);
-    execute format('create policy %I on public.%I for insert to authenticated with check (public.is_admin())',
+    execute format('create policy %I on public.%I for insert to authenticated with check (public.can_manage_master_data())',
                    t || '_insert', t);
-    execute format('create policy %I on public.%I for update to authenticated using (public.is_admin()) with check (public.is_admin())',
+    execute format('create policy %I on public.%I for update to authenticated using (public.can_manage_master_data()) with check (public.can_manage_master_data())',
                    t || '_update', t);
   end loop;
 end $$;
@@ -148,7 +148,7 @@ revoke execute on all functions in schema public from public, anon;
 
 grant execute on function
   public.is_active_user(), public.has_role(public.app_role), public.has_any_role(public.app_role[]),
-  public.is_admin(), public.can_access_warehouse(uuid), public.can_access_warehouse_code(text),
+  public.is_admin(), public.can_manage_master_data(), public.can_access_warehouse(uuid), public.can_access_warehouse_code(text),
   public.can_access_movement(uuid), public.get_settings(), public.request_header(text),
   public.jsonb_diff(jsonb, jsonb),
   public.movement_matches(public.v_movements, jsonb, text),

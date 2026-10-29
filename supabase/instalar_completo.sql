@@ -557,6 +557,15 @@ as $$
   select public.has_role('admin');
 $$;
 
+create or replace function public.can_manage_master_data()
+returns boolean
+language sql stable security definer
+set search_path = public, pg_temp
+as $$
+  -- Cadastros de materiais, funcionários e tabelas auxiliares: administrador e almoxarife.
+  select public.has_any_role(array['admin', 'almoxarife']::public.app_role[]);
+$$;
+
 -- Administrador acessa todos os estoques; demais perfis somente os vinculados.
 create or replace function public.can_access_warehouse(p_warehouse_id uuid)
 returns boolean
@@ -1891,11 +1900,16 @@ language plpgsql security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_m      public.stock_movements;
-  v_reason text := nullif(btrim(coalesce(p_reason, '')), '');
+  v_m       public.stock_movements;
+  v_reason  text := nullif(btrim(coalesce(p_reason, '')), '');
+  v_manager boolean := public.has_any_role(array['gestor', 'admin']::public.app_role[]);
+  v_storekeeper boolean := public.has_role('almoxarife');
 begin
-  if not public.has_any_role(array['gestor', 'admin']::public.app_role[]) then
-    raise exception 'Somente gestor ou administrador pode cancelar uma ME.' using errcode = '42501';
+  -- Gestor/admin: cancelam em qualquer status.
+  -- Almoxarife: somente devolução/erro ANTES do lançamento no ERP
+  -- (status Aguardando SA ou Aguardando aprovação), no estoque autorizado.
+  if not v_manager and not v_storekeeper then
+    raise exception 'Seu perfil não permite cancelar uma ME.' using errcode = '42501';
   end if;
   if v_reason is null or length(v_reason) < 5 then
     raise exception 'Informe a justificativa do cancelamento (mínimo 5 caracteres).' using errcode = '22023';
@@ -1907,6 +1921,10 @@ begin
   end if;
   if v_m.status = 'cancelada' then
     raise exception 'A ME % já está cancelada.', v_m.me_number using errcode = 'P0001';
+  end if;
+  if not v_manager and v_m.status not in ('aguardando_sa', 'aguardando_aprovacao') then
+    raise exception 'A ME % já tem SA lançada no ERP. Somente gestor ou administrador pode cancelá-la.', v_m.me_number
+      using errcode = '42501';
   end if;
 
   perform set_config('app.audit_action', 'me.cancelada', true);
@@ -2389,8 +2407,8 @@ as $$
 declare
   v_qr text := public.generate_qr_value();
 begin
-  if not public.is_admin() then
-    raise exception 'Somente administrador pode gerar um novo QR Code.' using errcode = '42501';
+  if not public.can_manage_master_data() then
+    raise exception 'Somente administrador ou almoxarife pode gerar um novo QR Code.' using errcode = '42501';
   end if;
   update public.materials set qr_code = v_qr where id = p_material_id;
   if not found then
@@ -2439,8 +2457,8 @@ declare
   v_code      text;
   v_exists    boolean;
 begin
-  if not public.is_admin() then
-    raise exception 'Somente administrador pode importar materiais.' using errcode = '42501';
+  if not public.can_manage_master_data() then
+    raise exception 'Somente administrador ou almoxarife pode importar materiais.' using errcode = '42501';
   end if;
   if jsonb_typeof(p_rows) <> 'array' then
     raise exception 'Formato de importação inválido.' using errcode = '22023';
@@ -2791,8 +2809,8 @@ declare
   v_sector_id uuid;
   v_exists    boolean;
 begin
-  if not public.is_admin() then
-    raise exception 'Somente administrador pode importar funcionários.' using errcode = '42501';
+  if not public.can_manage_master_data() then
+    raise exception 'Somente administrador ou almoxarife pode importar funcionários.' using errcode = '42501';
   end if;
   if jsonb_typeof(p_rows) <> 'array' then
     raise exception 'Formato de importação inválido.' using errcode = '22023';
@@ -2920,7 +2938,7 @@ create policy app_settings_select on public.app_settings
 
 -- ---------------------------------------------------------------------
 -- Cadastros auxiliares, funcionários e materiais
--- Leitura: usuários ativos. Inclusão/alteração: administrador.
+-- Leitura: usuários ativos. Inclusão/alteração: administrador e almoxarife.
 -- Não há DELETE: utilize o campo "active" (inativação).
 -- ---------------------------------------------------------------------
 do $$
@@ -2933,9 +2951,9 @@ begin
   ] loop
     execute format('create policy %I on public.%I for select to authenticated using (public.is_active_user())',
                    t || '_select', t);
-    execute format('create policy %I on public.%I for insert to authenticated with check (public.is_admin())',
+    execute format('create policy %I on public.%I for insert to authenticated with check (public.can_manage_master_data())',
                    t || '_insert', t);
-    execute format('create policy %I on public.%I for update to authenticated using (public.is_admin()) with check (public.is_admin())',
+    execute format('create policy %I on public.%I for update to authenticated using (public.can_manage_master_data()) with check (public.can_manage_master_data())',
                    t || '_update', t);
   end loop;
 end $$;
@@ -3004,7 +3022,7 @@ revoke execute on all functions in schema public from public, anon;
 
 grant execute on function
   public.is_active_user(), public.has_role(public.app_role), public.has_any_role(public.app_role[]),
-  public.is_admin(), public.can_access_warehouse(uuid), public.can_access_warehouse_code(text),
+  public.is_admin(), public.can_manage_master_data(), public.can_access_warehouse(uuid), public.can_access_warehouse_code(text),
   public.can_access_movement(uuid), public.get_settings(), public.request_header(text),
   public.jsonb_diff(jsonb, jsonb),
   public.movement_matches(public.v_movements, jsonb, text),

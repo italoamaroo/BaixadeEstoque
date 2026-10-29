@@ -71,7 +71,7 @@ begin;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
 select testes.falha($$select public.admin_set_user_access('00000000-0000-0000-0000-0000000000a1', 'X X X', '{admin}', '{}', true, null)$$, 'Somente administrador');
-select testes.falha($$insert into public.materials (code, name, unit) values ('X1', 'Teste', 'UN')$$, 'row-level security');
+select testes.falha($$insert into public.warehouses (code, name) values ('XX', 'Teste')$$, 'row-level security');
 select testes.falha($$insert into public.stock_movements (id, me_number) values (gen_random_uuid(), 'X')$$, 'permission denied');
 select testes.falha($$insert into public.user_roles values (auth.uid(), 'admin')$$, 'permission denied');
 commit;
@@ -206,7 +206,7 @@ select testes.falha(format($$select public.inform_sa('%s', 'SA-2026-0009')$$, :'
 select testes.igual((public.inform_sa(:'me1', 'SA-2026-0009', 'Número digitado errado no ERP') ->> 'action'), 'correcao', 'correção de SA com justificativa');
 select testes.igual((public.complete_movement(:'me1') ->> 'status'), 'concluida', 'ME concluída');
 select testes.falha(format($$select public.inform_sa('%s', 'SA-2026-0010', 'Ajuste após conclusão')$$, :'me1'), 'Somente gestor');
-select testes.falha(format($$select public.cancel_movement('%s', 'Teste de cancelamento')$$, :'me2'), 'Somente gestor');
+select testes.falha(format($$select public.cancel_movement('%s', 'Teste de cancelamento')$$, :'me2'), 'não permite cancelar');
 commit;
 
 -- ---------------------------------------------------------------------

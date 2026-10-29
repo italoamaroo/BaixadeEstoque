@@ -51,6 +51,15 @@ as $$
   select public.has_role('admin');
 $$;
 
+create or replace function public.can_manage_master_data()
+returns boolean
+language sql stable security definer
+set search_path = public, pg_temp
+as $$
+  -- Cadastros de materiais, funcionários e tabelas auxiliares: administrador e almoxarife.
+  select public.has_any_role(array['admin', 'almoxarife']::public.app_role[]);
+$$;
+
 -- Administrador acessa todos os estoques; demais perfis somente os vinculados.
 create or replace function public.can_access_warehouse(p_warehouse_id uuid)
 returns boolean

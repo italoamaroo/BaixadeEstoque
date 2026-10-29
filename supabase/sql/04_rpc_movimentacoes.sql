@@ -801,11 +801,16 @@ language plpgsql security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_m      public.stock_movements;
-  v_reason text := nullif(btrim(coalesce(p_reason, '')), '');
+  v_m       public.stock_movements;
+  v_reason  text := nullif(btrim(coalesce(p_reason, '')), '');
+  v_manager boolean := public.has_any_role(array['gestor', 'admin']::public.app_role[]);
+  v_storekeeper boolean := public.has_role('almoxarife');
 begin
-  if not public.has_any_role(array['gestor', 'admin']::public.app_role[]) then
-    raise exception 'Somente gestor ou administrador pode cancelar uma ME.' using errcode = '42501';
+  -- Gestor/admin: cancelam em qualquer status.
+  -- Almoxarife: somente devolução/erro ANTES do lançamento no ERP
+  -- (status Aguardando SA ou Aguardando aprovação), no estoque autorizado.
+  if not v_manager and not v_storekeeper then
+    raise exception 'Seu perfil não permite cancelar uma ME.' using errcode = '42501';
   end if;
   if v_reason is null or length(v_reason) < 5 then
     raise exception 'Informe a justificativa do cancelamento (mínimo 5 caracteres).' using errcode = '22023';
@@ -817,6 +822,10 @@ begin
   end if;
   if v_m.status = 'cancelada' then
     raise exception 'A ME % já está cancelada.', v_m.me_number using errcode = 'P0001';
+  end if;
+  if not v_manager and v_m.status not in ('aguardando_sa', 'aguardando_aprovacao') then
+    raise exception 'A ME % já tem SA lançada no ERP. Somente gestor ou administrador pode cancelá-la.', v_m.me_number
+      using errcode = '42501';
   end if;
 
   perform set_config('app.audit_action', 'me.cancelada', true);

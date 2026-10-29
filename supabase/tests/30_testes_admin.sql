@@ -51,3 +51,55 @@ commit;
 
 update public.app_settings set require_approval = false where id = 1;
 \echo '>>> TESTES DE ADMINISTRAÇÃO PASSARAM'
+
+-- Cancelamento pelo almoxarife (devolução antes da SA)
+\set me5 '55555555-5555-4555-8555-555555555555'
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+insert into storage.objects (bucket_id, name, owner, metadata)
+values ('assinaturas', 'MUR/' || :'ano' || '/' || :'me5' || '/assinatura_1.png', auth.uid(), '{"size": 100}');
+select public.create_movement(format($${"id":"%s","warehouse_id":"%s","contract_id":"%s","sector_id":"%s","requester_employee_id":"%s",
+  "items":[{"material_id":"%s","quantity_requested":1,"quantity_delivered":1}],"signature":{"storage_path":"MUR/%s/%s/assinatura_1.png"}}$$,
+  :'me5', :'mur', :'contrato', :'setor', :'func1', :'oleo', :'ano', :'me5')::jsonb);
+select testes.falha(format($$select public.cancel_movement('%s', '')$$, :'me5'), 'justificativa');
+select testes.igual((public.cancel_movement(:'me5', 'Devolução do material: sem uso') ->> 'status'), 'cancelada', 'almoxarife cancela ME aguardando SA (devolução)');
+commit;
+
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+-- me4 (do teste de aprovação) está aguardando SA; informa SA como equipe e tenta cancelar como almoxarife
+commit;
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b1', true);
+select public.inform_sa(:'me4', 'SA-APR-0004');
+commit;
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+select testes.falha(format($$select public.cancel_movement('%s', 'Devolução do material')$$, :'me4'), 'Somente gestor ou administrador');
+commit;
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a2', true);
+select testes.falha(format($$select public.cancel_movement('%s', 'Devolução do material')$$, :'me4'), 'ME não encontrada');
+commit;
+\echo '>>> TESTES DE CANCELAMENTO PELO ALMOXARIFE PASSARAM'
+
+-- Cadastros pelo almoxarife; equipe SA continua sem acesso
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+select testes.igual((public.import_materials('[{"code":"ALMOX-T1","name":"Item do almoxarife","unit":"UN"}]') ->> 'inseridos')::int, 1, 'almoxarife importa materiais');
+select testes.igual((public.import_employees('[{"registration":"ALMOX-F1","full_name":"Funcionário almox"}]') ->> 'inseridos')::int, 1, 'almoxarife importa funcionários');
+select testes.falha($$select public.update_settings('{"me_prefix":"XX"}')$$, 'Somente administrador');
+commit;
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b1', true);
+select testes.falha($$insert into public.materials (code, name, unit) values ('SA-X1', 'Teste', 'UN')$$, 'row-level security');
+select testes.falha($$select public.import_materials('[]')$$, 'Somente administrador ou almoxarife');
+commit;
+\echo '>>> TESTES DE CADASTRO PELO ALMOXARIFE PASSARAM'
