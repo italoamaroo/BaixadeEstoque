@@ -124,11 +124,10 @@ export function matrixToRows(matrix: unknown[][]): Record<string, unknown>[] {
     .filter((r) => Object.values(r).some((v) => v !== '' && v !== undefined));
 }
 
-export async function parseImportFile(file: File): Promise<Record<string, unknown>[]> {
+/** Lê a primeira aba de um .xlsx ou um .csv e devolve a matriz de células. */
+export async function readSheetMatrix(file: File): Promise<unknown[][]> {
   if (file.size > 5 * 1024 * 1024) throw new Error('Arquivo maior que 5 MB.');
-  if (/\.csv$/i.test(file.name) || file.type === 'text/csv') {
-    return matrixToRows(parseCsv(await file.text()));
-  }
+  if (/\.csv$/i.test(file.name) || file.type === 'text/csv') return parseCsv(await file.text());
   if (/\.xls$/i.test(file.name)) {
     throw new Error('Arquivo .xls (Excel antigo) não é suportado. No Excel, use "Salvar como" > "Pasta de Trabalho do Excel (.xlsx)".');
   }
@@ -140,13 +139,76 @@ export async function parseImportFile(file: File): Promise<Record<string, unknow
     if (!ws) throw new Error('Planilha vazia.');
     const matrix: unknown[][] = [];
     ws.eachRow({ includeEmpty: false }, (row) => {
-      const values = (row.values as unknown[]).slice(1);
-      matrix.push(values);
+      matrix.push((row.values as unknown[]).slice(1));
     });
     if (matrix.length === 0) throw new Error('Planilha vazia.');
-    return matrixToRows(matrix);
+    return matrix;
   }
   throw new Error('Formato não suportado. Use .xlsx ou .csv.');
+}
+
+export async function parseImportFile(file: File): Promise<Record<string, unknown>[]> {
+  return matrixToRows(await readSheetMatrix(file));
+}
+
+// ---------------------------------------------------------------------------
+// Planilha para ETIQUETAS: código obrigatório; cópias, nome e unidade opcionais
+// ---------------------------------------------------------------------------
+const COPY_ALIASES = ['copias', 'cópias', 'qtd', 'qtde', 'quantidade', 'quant', 'etiquetas', 'qtd etiquetas', 'quantidade de etiquetas', 'copies'];
+
+export interface LabelSheetRow {
+  code: string;
+  copies: number;
+  /** demais colunas reconhecidas (nome, unidade...) para cadastrar itens que não existirem */
+  material: Record<string, unknown>;
+}
+
+export function labelMatrixToRows(matrix: unknown[][]): LabelSheetRow[] {
+  let headerIdx = -1;
+  let keys: (string | null)[] = [];
+  for (let i = 0; i < Math.min(matrix.length, 15); i++) {
+    const k = (matrix[i] ?? []).map((h) => {
+      const t = cellText(h);
+      return COPY_ALIASES.map(norm).includes(norm(t)) ? 'copies' : mapHeader(t);
+    });
+    if (k.includes('code')) {
+      headerIdx = i;
+      keys = k;
+      break;
+    }
+  }
+  if (headerIdx < 0) throw new Error('Cabeçalho não encontrado: a planilha precisa ter a coluna "codigo" (código do material).');
+  const useDescriptionAsName = !keys.includes('name');
+  const byCode = new Map<string, LabelSheetRow>();
+  for (const line of matrix.slice(headerIdx + 1)) {
+    const material: Record<string, unknown> = {};
+    let copies = 1;
+    keys.forEach((k, i) => {
+      if (!k) return;
+      const v = cellText((line ?? [])[i]);
+      if (k === 'copies') {
+        const n = Math.floor(Number(v.replace(',', '.')));
+        copies = Number.isFinite(n) && n > 0 ? Math.min(n, 100) : 1;
+      } else if (k === 'active') {
+        const b = toBool(v);
+        if (b !== undefined) material.active = b;
+      } else if (material[k] === undefined || material[k] === '') material[k] = v;
+    });
+    if (useDescriptionAsName && material.description) {
+      material.name = material.description;
+      delete material.description;
+    }
+    const code = String(material.code ?? '').trim().toUpperCase();
+    if (!code) continue;
+    const prev = byCode.get(code);
+    if (prev) prev.copies = Math.min(prev.copies + copies, 100);
+    else byCode.set(code, { code, copies, material: { ...material, code } });
+  }
+  return [...byCode.values()];
+}
+
+export async function parseLabelsFile(file: File): Promise<LabelSheetRow[]> {
+  return labelMatrixToRows(await readSheetMatrix(file));
 }
 
 export async function downloadImportTemplate() {

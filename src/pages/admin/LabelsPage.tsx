@@ -1,13 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Printer, Trash2 } from 'lucide-react';
+import { Download, FileSpreadsheet, Printer, Trash2, Upload } from 'lucide-react';
+import { toast } from 'sonner';
 import clsx from 'clsx';
 import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, EmptyState, PageHeader } from '@/components/ui/Card';
+import { Alert, Card, CardHeader, EmptyState, PageHeader } from '@/components/ui/Card';
 import { Checkbox, Select } from '@/components/ui/Field';
+import { Modal } from '@/components/ui/Modal';
 import { MaterialSearch } from '@/components/MaterialSearch';
 import { QRCodeImage } from '@/components/QRCodeImage';
-import { getMaterialsByIds, markLabelsPrinted } from '@/lib/api';
+import { getMaterialsByCodes, getMaterialsByIds, importMaterials, markLabelsPrinted, withRetry } from '@/lib/api';
+import { downloadBlob } from '@/lib/excel';
+import { errorMessage } from '@/lib/errors';
+import { fmtInt } from '@/lib/format';
+import { parseLabelsFile, type LabelSheetRow } from '@/lib/import';
+import { useAuth } from '@/contexts/AuthContext';
 import type { Material } from '@/types/db';
 
 interface LabelSize {
@@ -40,6 +47,8 @@ const SIZES = {
 } satisfies Record<string, LabelSize>;
 
 type SizeKey = keyof typeof SIZES;
+/** limite por impressão, para o navegador não travar */
+const MAX_LABELS = 1000;
 const SIZE_KEY = 'baixas-estoque:etiqueta-tamanho';
 
 function loadSize(): SizeKey {
@@ -65,6 +74,8 @@ export function LabelsPage() {
     }
   };
   const [showLocation, setShowLocation] = useState(true);
+  const [importOpen, setImportOpen] = useState(false);
+  const [preparing, setPreparing] = useState(false);
 
   useEffect(() => {
     const ids = (params.get('ids') ?? '').split(',').filter(Boolean);
@@ -78,9 +89,33 @@ export function LabelsPage() {
   const add = (m: Material) =>
     setItems((list) => (list.some((x) => x.material.id === m.id) ? list : [...list, { material: m, copies: 1 }]));
 
-  const print = () => {
+  const print = async () => {
+    if (labels.length > MAX_LABELS) {
+      toast.error(`Imprima no máximo ${fmtInt(MAX_LABELS)} etiquetas por vez. Reduza as cópias ou remova itens.`);
+      return;
+    }
+    // espera todos os QR Codes serem gerados antes de abrir a impressão
+    setPreparing(true);
+    const start = Date.now();
+    while (document.querySelectorAll('.labels-sheet img').length < labels.length && Date.now() - start < 20000) {
+      await new Promise((r) => setTimeout(r, 150));
+    }
+    setPreparing(false);
     void markLabelsPrinted(items.map((i) => i.material.id));
     window.print();
+  };
+
+  /** Inclui na lista os materiais vindos da planilha (somando cópias de quem já estava). */
+  const addFromSheet = (list: { material: Material; copies: number }[], replace: boolean) => {
+    setItems((current) => {
+      const base = replace ? [] : [...current];
+      for (const it of list) {
+        const ex = base.find((x) => x.material.id === it.material.id);
+        if (ex) ex.copies = Math.min(100, ex.copies + it.copies);
+        else base.push({ ...it });
+      }
+      return base;
+    });
   };
 
   const s: LabelSize = SIZES[size];
@@ -110,14 +145,34 @@ export function LabelsPage() {
           title="Etiquetas com QR Code"
           subtitle="Selecione os materiais, ajuste o tamanho e imprima. Funciona com impressora comum (A4) ou de etiquetas."
           actions={
-            <Button icon={<Printer className="h-4 w-4" />} onClick={print} disabled={items.length === 0}>
-              Imprimir {labels.length} etiqueta(s)
-            </Button>
+            <>
+              <Button variant="secondary" icon={<Upload className="h-4 w-4" />} onClick={() => setImportOpen(true)}>
+                Importar planilha
+              </Button>
+              {items.length > 0 && (
+                <Button variant="ghost" icon={<Trash2 className="h-4 w-4" />} onClick={() => setItems([])}>
+                  Limpar lista
+                </Button>
+              )}
+              <Button icon={<Printer className="h-4 w-4" />} onClick={() => void print()} disabled={items.length === 0} loading={preparing}>
+                {preparing ? 'Preparando…' : `Imprimir ${fmtInt(labels.length)} etiqueta(s)`}
+              </Button>
+            </>
           }
         />
         <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
           <Card>
-            <CardHeader title="Materiais selecionados" />
+            <CardHeader
+              title="Materiais selecionados"
+              subtitle={items.length ? `${fmtInt(items.length)} material(is) · ${fmtInt(labels.length)} etiqueta(s)` : undefined}
+            />
+            {labels.length > MAX_LABELS && (
+              <div className="mb-3">
+                <Alert tone="warning">
+                  São {fmtInt(labels.length)} etiquetas. Imprima no máximo {fmtInt(MAX_LABELS)} por vez: reduza as cópias ou divida a planilha.
+                </Alert>
+              </div>
+            )}
             {items.length === 0 ? (
               <EmptyState title="Nenhum material selecionado" description="Pesquise ao lado ou selecione na tela de Materiais." />
             ) : (
@@ -246,6 +301,212 @@ export function LabelsPage() {
           </div>
         ))}
       </div>
+      <ImportLabelsModal open={importOpen} onClose={() => setImportOpen(false)} onConfirm={addFromSheet} />
     </div>
+  );
+}
+
+interface Analysis {
+  rows: LabelSheetRow[];
+  found: { material: Material; copies: number }[];
+  inactive: Material[];
+  missing: LabelSheetRow[];
+}
+
+/** Importa uma planilha (.xlsx/.csv) com os códigos dos materiais e gera as etiquetas de todos. */
+function ImportLabelsModal({
+  open,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: (list: { material: Material; copies: number }[], replace: boolean) => void;
+}) {
+  const { can } = useAuth();
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [replace, setReplace] = useState(true);
+  const [createMissing, setCreateMissing] = useState(true);
+
+  useEffect(() => {
+    if (open) {
+      setAnalysis(null);
+      setError(null);
+      setProgress('');
+      setReplace(true);
+      setCreateMissing(true);
+    }
+  }, [open]);
+
+  const analyze = async (rows: LabelSheetRow[]): Promise<Analysis> => {
+    setProgress(`Procurando ${fmtInt(rows.length)} código(s) no cadastro…`);
+    const mats = await getMaterialsByCodes(rows.map((r) => r.code));
+    const byCode = new Map(mats.map((m) => [m.code.toUpperCase(), m]));
+    const found: Analysis['found'] = [];
+    const inactive: Material[] = [];
+    const missing: LabelSheetRow[] = [];
+    for (const r of rows) {
+      const m = byCode.get(r.code);
+      if (!m) missing.push(r);
+      else if (!m.active) inactive.push(m);
+      else found.push({ material: m, copies: r.copies });
+    }
+    return { rows, found, inactive, missing };
+  };
+
+  const onFile = async (f: File | undefined) => {
+    if (!f) return;
+    setError(null);
+    setAnalysis(null);
+    setBusy(true);
+    try {
+      const rows = await parseLabelsFile(f);
+      if (rows.length === 0) throw new Error('Nenhum código encontrado na planilha.');
+      setAnalysis(await analyze(rows));
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+      setProgress('');
+    }
+  };
+
+  const creatable = (analysis?.missing ?? []).filter((r) => String(r.material.name ?? '').trim() && String(r.material.unit ?? '').trim());
+  const canCreate = can('manageMasterData') && creatable.length > 0;
+
+  const confirm = async () => {
+    if (!analysis || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      let result = analysis;
+      if (canCreate && createMissing) {
+        for (let i = 0; i < creatable.length; i += 500) {
+          setProgress(`Cadastrando materiais ${fmtInt(Math.min(i + 500, creatable.length))} de ${fmtInt(creatable.length)}…`);
+          const part = creatable.slice(i, i + 500).map((r) => r.material);
+          await withRetry(() => importMaterials(part));
+        }
+        result = await analyze(analysis.rows);
+        setAnalysis(result);
+      }
+      if (result.found.length === 0) throw new Error('Nenhum material ativo encontrado para gerar etiquetas.');
+      onConfirm(result.found, replace);
+      const total = result.found.reduce((s, x) => s + x.copies, 0);
+      toast.success(`${fmtInt(result.found.length)} material(is) adicionados · ${fmtInt(total)} etiqueta(s).`);
+      onClose();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+      setProgress('');
+    }
+  };
+
+  const downloadTemplate = async () => {
+    const ExcelJS = (await import('exceljs')).default;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('etiquetas');
+    ws.columns = [
+      { header: 'codigo', key: 'code', width: 20 },
+      { header: 'copias', key: 'copies', width: 10 },
+      { header: 'nome', key: 'name', width: 40 },
+      { header: 'unidade', key: 'unit', width: 10 },
+      { header: 'localizacao', key: 'location', width: 14 },
+    ];
+    ws.addRow({ code: 'AA001466D', copies: 2, name: 'SERRA COPO BIMET TRAMONTINA 42620515 JG 15 PCS', unit: 'PC', location: 'D-03-02' });
+    ws.addRow({ code: 'BC002A83', copies: 1 });
+    ws.getRow(1).font = { bold: true };
+    const buf = await wb.xlsx.writeBuffer();
+    downloadBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'modelo_etiquetas.xlsx');
+  };
+
+  const totalLabels = analysis?.found.reduce((s, x) => s + x.copies, 0) ?? 0;
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      busy={busy}
+      size="lg"
+      title="Gerar etiquetas a partir de planilha"
+      description="Planilha .xlsx ou .csv com os códigos dos materiais. Opcional: coluna de cópias (quantas etiquetas por item)."
+      footer={
+        <>
+          <Button variant="ghost" icon={<Download className="h-4 w-4" />} onClick={() => void downloadTemplate()}>
+            Baixar modelo
+          </Button>
+          <Button onClick={() => void confirm()} loading={busy} disabled={!analysis || (analysis.found.length === 0 && !(canCreate && createMissing))}>
+            {busy && progress ? progress : 'Gerar etiquetas'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-slate-600">
+          Coluna obrigatória: <strong>codigo</strong> (também aceita “Cód. Produto”, “Código”, “Item”…). Opcional: <strong>copias</strong> (ou
+          “Qtd”, “Quantidade”). Sem essa coluna, sai 1 etiqueta por item. Códigos repetidos somam as cópias. Pode usar a mesma planilha da
+          importação de materiais.
+        </p>
+        <label className="flex cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed border-slate-300 p-4 hover:border-brand-400">
+          <FileSpreadsheet className="h-8 w-8 text-emerald-600" />
+          <span className="text-sm">
+            <span className="font-semibold text-brand-700">Escolher planilha</span>
+            <span className="block text-slate-500">.xlsx ou .csv, até 5 MB</span>
+          </span>
+          <input type="file" accept=".xlsx,.xls,.csv,text/csv" className="hidden" onChange={(e) => void onFile(e.target.files?.[0])} />
+        </label>
+        {busy && progress && !analysis && <p className="text-sm text-slate-500">{progress}</p>}
+        {error && <Alert tone="error">{error}</Alert>}
+        {analysis && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2 text-center text-sm">
+              <div className="rounded-lg bg-emerald-50 p-3">
+                <p className="text-xl font-bold text-emerald-700">{fmtInt(analysis.found.length)}</p>
+                <p className="text-emerald-800">encontrados</p>
+              </div>
+              <div className="rounded-lg bg-orange-50 p-3">
+                <p className="text-xl font-bold text-orange-700">{fmtInt(analysis.missing.length)}</p>
+                <p className="text-orange-800">não cadastrados</p>
+              </div>
+              <div className="rounded-lg bg-slate-100 p-3">
+                <p className="text-xl font-bold text-slate-700">{fmtInt(analysis.inactive.length)}</p>
+                <p className="text-slate-600">inativos (ignorados)</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-700">
+              Etiquetas a gerar: <strong>{fmtInt(totalLabels)}</strong>
+              {totalLabels > MAX_LABELS && <span className="text-orange-700"> · acima de {fmtInt(MAX_LABELS)}, imprima em partes</span>}
+            </p>
+            {analysis.missing.length > 0 && (
+              <Alert tone="warning" title={`${fmtInt(analysis.missing.length)} código(s) não estão cadastrados`}>
+                <p className="max-h-20 overflow-auto font-mono text-xs">
+                  {analysis.missing.slice(0, 60).map((r) => r.code).join(', ')}
+                  {analysis.missing.length > 60 ? '…' : ''}
+                </p>
+                {canCreate ? (
+                  <div className="mt-2">
+                    <Checkbox
+                      label={`Cadastrar automaticamente ${fmtInt(creatable.length)} item(ns) que têm nome e unidade na planilha`}
+                      checked={createMissing}
+                      onChange={setCreateMissing}
+                    />
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs">
+                    {can('manageMasterData')
+                      ? 'Para cadastrá-los aqui, a planilha precisa ter as colunas nome (ou descrição) e unidade.'
+                      : 'Peça o cadastro ao almoxarife ou administrador.'}
+                  </p>
+                )}
+              </Alert>
+            )}
+            <Checkbox label="Substituir a lista atual" description="Desmarque para somar aos materiais que já estão na tela." checked={replace} onChange={setReplace} />
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }

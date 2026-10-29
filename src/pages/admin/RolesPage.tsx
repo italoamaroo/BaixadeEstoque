@@ -22,7 +22,8 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   viewDashboard: 'Painel e consultas dos estoques autorizados',
   viewAudit: 'Consultar auditoria',
   printLabels: 'Imprimir etiquetas QR Code',
-  manageMasterData: 'Cadastros (materiais, funcionários, estoques, auxiliares)',
+  manageMasterData: 'Cadastros de materiais, QR Codes, funcionários e tabelas auxiliares (incluir, editar, importar)',
+  manageWarehouses: 'Cadastro de estoques',
   manageUsers: 'Usuários, perfis e vínculos com estoques',
   manageSettings: 'Parâmetros do sistema',
 };

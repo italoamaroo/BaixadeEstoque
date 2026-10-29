@@ -44,7 +44,7 @@ const REGISTRY: NavItem[] = [
   { to: '/cadastros/materiais', label: 'Materiais', icon: <Boxes className="h-5 w-5" />, perm: 'manageMasterData' },
   { to: '/cadastros/etiquetas', label: 'Etiquetas QR Code', icon: <QrCode className="h-5 w-5" />, perm: 'printLabels' },
   { to: '/cadastros/funcionarios', label: 'Funcionários', icon: <Users className="h-5 w-5" />, perm: 'manageMasterData' },
-  { to: '/cadastros/estoques', label: 'Estoques', icon: <WarehouseIcon className="h-5 w-5" />, perm: 'manageMasterData' },
+  { to: '/cadastros/estoques', label: 'Estoques', icon: <WarehouseIcon className="h-5 w-5" />, perm: 'manageWarehouses' },
   { to: '/cadastros/auxiliares', label: 'Cadastros auxiliares', icon: <Database className="h-5 w-5" />, perm: 'manageMasterData' },
 ];
 

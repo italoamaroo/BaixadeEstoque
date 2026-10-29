@@ -37,10 +37,10 @@ export const ROLE_LABELS: Record<AppRole, string> = {
 };
 
 export const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
-  almoxarife: 'Registra saídas nos estoques autorizados: lê QR Code, monta a ME, coleta assinatura e consulta as movimentações do estoque.',
+  almoxarife: 'Registra saídas nos estoques autorizados (lê QR Code, monta a ME, coleta assinatura), cancela por devolução antes da SA e cadastra materiais, QR Codes/etiquetas, funcionários e tabelas auxiliares.',
   equipe_sa: 'Consulta as MEs, acompanha pendências, informa e corrige o número da SA (com justificativa) e conclui o lançamento.',
   gestor: 'Painel gerencial, todas as consultas, assinaturas, histórico, exportação para Excel, aprovação, correção e cancelamento de MEs.',
-  admin: 'Cadastros (usuários, perfis, estoques, funcionários, materiais, QR Codes, tabelas auxiliares), parâmetros e auditoria.',
+  admin: 'Tudo do almoxarife nos cadastros, mais usuários, perfis, estoques, parâmetros e auditoria.',
 };
 
 /** Ações da interface por perfil. A mesma regra existe no banco (RLS + RPC). */
@@ -58,7 +58,8 @@ export const PERMISSIONS = {
   viewDashboard: ['gestor', 'admin', 'equipe_sa', 'almoxarife'],
   viewAudit: ['gestor', 'admin'],
   printLabels: ['admin', 'gestor', 'almoxarife'],
-  manageMasterData: ['admin'],
+  manageMasterData: ['admin', 'almoxarife'],
+  manageWarehouses: ['admin'],
   manageUsers: ['admin'],
   manageSettings: ['admin'],
 } as const satisfies Record<string, readonly AppRole[]>;

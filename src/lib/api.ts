@@ -270,6 +270,17 @@ export async function getMaterialsByIds(ids: string[]): Promise<Material[]> {
   return (unwrap(res) ?? []) as Material[];
 }
 
+/** Busca materiais pelo código (em lotes, para planilhas grandes). */
+export async function getMaterialsByCodes(codes: string[]): Promise<Material[]> {
+  const unique = [...new Set(codes.map((c) => c.trim().toUpperCase()).filter(Boolean))];
+  const out: Material[] = [];
+  for (let i = 0; i < unique.length; i += 150) {
+    const res = await supabase.from('materials').select('*').in('code', unique.slice(i, i + 150));
+    out.push(...((unwrap(res) ?? []) as Material[]));
+  }
+  return out;
+}
+
 export async function saveMaterial(m: Partial<Material> & { code: string; name: string; unit: string; active: boolean }) {
   const body: Record<string, unknown> = {
     code: m.code.trim().toUpperCase(),

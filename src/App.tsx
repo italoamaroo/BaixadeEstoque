@@ -57,7 +57,7 @@ function AppRoutes() {
               <Route path="cadastros/materiais" element={<RequirePermission perm="manageMasterData"><MaterialsPage /></RequirePermission>} />
               <Route path="cadastros/etiquetas" element={<RequirePermission perm="printLabels"><LabelsPage /></RequirePermission>} />
               <Route path="cadastros/funcionarios" element={<RequirePermission perm="manageMasterData"><EmployeesPage /></RequirePermission>} />
-              <Route path="cadastros/estoques" element={<RequirePermission perm="manageMasterData"><WarehousesPage /></RequirePermission>} />
+              <Route path="cadastros/estoques" element={<RequirePermission perm="manageWarehouses"><WarehousesPage /></RequirePermission>} />
               <Route path="cadastros/auxiliares" element={<RequirePermission perm="manageMasterData"><LookupsPage /></RequirePermission>} />
 
               <Route path="admin/usuarios" element={<RequirePermission perm="manageUsers"><UsersPage /></RequirePermission>} />
