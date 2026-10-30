@@ -16,6 +16,7 @@ import { fmtInt } from '@/lib/format';
 import { parseLabelsFile, type LabelSheetRow } from '@/lib/import';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Material } from '@/types/db';
+import { CorridorLabels } from './CorridorLabels';
 
 interface LabelSize {
   label: string;
@@ -63,7 +64,50 @@ function loadSize(): SizeKey {
   return 'termica7025';
 }
 
+const TAB_KEY = 'baixas-estoque:etiqueta-aba';
+
+/** Etiquetas de materiais (QR Code) e de corredores (só texto). */
 export function LabelsPage() {
+  const [tab, setTabState] = useState<'materiais' | 'corredores'>(() => {
+    try {
+      return localStorage.getItem(TAB_KEY) === 'corredores' ? 'corredores' : 'materiais';
+    } catch {
+      return 'materiais';
+    }
+  });
+  const setTab = (t: 'materiais' | 'corredores') => {
+    setTabState(t);
+    try {
+      localStorage.setItem(TAB_KEY, t);
+    } catch {
+      /* ignore */
+    }
+  };
+  return (
+    <div>
+      <div className="mb-4 inline-flex rounded-xl bg-slate-100 p-1 print:hidden">
+        {(
+          [
+            ['materiais', 'Materiais (QR Code)'],
+            ['corredores', 'Corredores'],
+          ] as const
+        ).map(([k, label]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setTab(k)}
+            className={clsx('rounded-lg px-4 py-2 text-sm font-semibold', tab === k ? 'bg-white text-brand-800 shadow' : 'text-slate-600')}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === 'materiais' ? <MaterialLabels /> : <CorridorLabels />}
+    </div>
+  );
+}
+
+function MaterialLabels() {
   const [params] = useSearchParams();
   const [items, setItems] = useState<{ material: Material; copies: number }[]>([]);
   const [size, setSizeState] = useState<SizeKey>(loadSize);
