@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { InformSaModal } from '@/components/InformSaModal';
+import { ErpBaixaModal } from '@/components/ErpBaixaModal';
 import { JustificationModal } from '@/components/JustificationModal';
 import { Button } from '@/components/ui/Button';
 import { Badge, StatusBadge } from '@/components/ui/Badge';
@@ -23,7 +24,6 @@ import { PageLoader, Spinner } from '@/components/ui/Spinner';
 import {
   approveMovement,
   cancelMovement,
-  completeMovement,
   getMaterialsByIds,
   getMovementAudit,
   getMovementDetail,
@@ -105,6 +105,7 @@ export function MovementDetailPage() {
   const [tab, setTab] = useState<'itens' | 'historico'>('itens');
   const [modal, setModal] = useState<null | 'sa' | 'cancel' | 'approve' | 'correct' | 'signature'>(null);
   const [busy, setBusy] = useState(false);
+  const [erpOpen, setErpOpen] = useState(false);
   const [cancelType, setCancelType] = useState('Devolução do material');
   const [printSigUrl, setPrintSigUrl] = useState<string | null>(null);
   const wantsPrint = params.get('imprimir') === '1';
@@ -261,8 +262,8 @@ export function MovementDetailPage() {
                 </Button>
               )}
               {m.status === 'sa_informada' && can('completeMovement') && (
-                <Button variant="success" icon={<CheckCheck className="h-4 w-4" />} loading={busy} onClick={() => void runAction(() => completeMovement(m.id), 'ME concluída.')}>
-                  Concluir
+                <Button variant="success" icon={<CheckCheck className="h-4 w-4" />} onClick={() => setErpOpen(true)}>
+                  Confirmar baixa no ERP
                 </Button>
               )}
               <Button variant="secondary" icon={<Printer className="h-4 w-4" />} onClick={() => setParams({ imprimir: '1' })}>
@@ -318,7 +319,7 @@ export function MovementDetailPage() {
               <KeyValue label="Número da SA" value={m.sa_number ? <span className="font-mono text-base font-semibold">{m.sa_number}</span> : <span className="text-orange-700">Pendente</span>} />
               <KeyValue label="Informada por" value={m.sa_informed_by_name} />
               <KeyValue label="Informada em" value={m.sa_informed_at ? fmtDateTime(m.sa_informed_at) : null} />
-              <KeyValue label="Concluída em" value={m.completed_at ? `${fmtDateTime(m.completed_at)} · ${m.completed_by_name ?? ''}` : null} />
+              <KeyValue label="Baixa no ERP confirmada em" value={m.completed_at ? `${fmtDateTime(m.completed_at)} · ${m.completed_by_name ?? ''}` : null} />
             </dl>
           </Card>
 
@@ -435,6 +436,7 @@ export function MovementDetailPage() {
       </div>
 
       <InformSaModal movement={modal === 'sa' ? m : null} onClose={() => setModal(null)} onDone={() => void load()} />
+      <ErpBaixaModal movement={erpOpen ? m : null} onClose={() => setErpOpen(false)} onDone={() => void load()} />
       <JustificationModal
         open={modal === 'cancel'}
         title={`Cancelar ${m.me_number}?`}

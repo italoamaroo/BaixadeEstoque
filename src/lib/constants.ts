@@ -5,7 +5,7 @@ export const STATUS_LABELS: Record<MovementStatus, string> = {
   aguardando_assinatura: 'Aguardando assinatura',
   aguardando_aprovacao: 'Aguardando aprovação',
   aguardando_sa: 'Aguardando SA',
-  sa_informada: 'SA informada',
+  sa_informada: 'Aguardando baixa no ERP',
   concluida: 'Concluída',
   cancelada: 'Cancelada',
 };
@@ -37,8 +37,8 @@ export const ROLE_LABELS: Record<AppRole, string> = {
 };
 
 export const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
-  almoxarife: 'Registra saídas nos estoques autorizados (lê QR Code, monta a ME, coleta assinatura), cancela por devolução antes da SA e cadastra materiais, QR Codes/etiquetas, funcionários e tabelas auxiliares.',
-  equipe_sa: 'Consulta as MEs, acompanha pendências, informa e corrige o número da SA (com justificativa) e conclui o lançamento.',
+  almoxarife: 'Registra saídas nos estoques autorizados (lê QR Code, monta a ME, coleta assinatura), faz a baixa no ERP com a SA informada e confirma no sistema, cancela por devolução antes da SA e cadastra materiais, QR Codes/etiquetas, funcionários e tabelas auxiliares.',
+  equipe_sa: 'Consulta as MEs, acompanha pendências, informa e corrige o número da SA (com justificativa). A baixa no ERP fica com o almoxarife.',
   gestor: 'Painel gerencial, todas as consultas, assinaturas, histórico, exportação para Excel, aprovação, correção e cancelamento de MEs.',
   admin: 'Tudo do almoxarife nos cadastros, mais usuários, perfis, estoques, parâmetros e auditoria.',
 };
@@ -47,7 +47,8 @@ export const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
 export const PERMISSIONS = {
   createMovement: ['almoxarife', 'gestor', 'admin'],
   informSa: ['equipe_sa', 'gestor', 'admin'],
-  completeMovement: ['equipe_sa', 'gestor', 'admin'],
+  completeMovement: ['almoxarife', 'gestor', 'admin'],
+  viewPending: ['equipe_sa', 'almoxarife', 'gestor', 'admin'],
   correctSaAfterCompletion: ['gestor', 'admin'],
   approveMovement: ['gestor', 'admin'],
   cancelMovement: ['gestor', 'admin'],
@@ -76,7 +77,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'me.finalizada': 'ME finalizada',
   'me.alterada': 'ME alterada',
   'me.aprovada': 'ME aprovada',
-  'me.concluida': 'ME concluída',
+  'me.concluida': 'Baixa no ERP confirmada (ME concluída)',
   'me.cancelada': 'ME cancelada',
   'me.corrigida': 'Correção administrativa',
   'me.recebedor_alterado': 'Recebedor alterado',

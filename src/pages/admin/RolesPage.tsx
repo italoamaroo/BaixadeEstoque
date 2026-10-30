@@ -11,7 +11,8 @@ const ROLES: AppRole[] = ['almoxarife', 'equipe_sa', 'gestor', 'admin'];
 const PERMISSION_LABELS: Record<Permission, string> = {
   createMovement: 'Registrar saída (ler QR, montar ME, coletar assinatura)',
   informSa: 'Informar e corrigir SA (antes da conclusão)',
-  completeMovement: 'Concluir ME com SA informada',
+  completeMovement: 'Fazer a baixa no ERP com a SA e confirmar (conclui a ME)',
+  viewPending: 'Ver pendências de SA e de baixa no ERP',
   correctSaAfterCompletion: 'Corrigir SA de ME concluída',
   approveMovement: 'Aprovar ME (quando exigido)',
   cancelMovement: 'Cancelar ME em qualquer status (lógico, com justificativa)',

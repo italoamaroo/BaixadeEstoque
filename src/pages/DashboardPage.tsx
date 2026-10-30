@@ -173,7 +173,7 @@ export function DashboardPage() {
               hint={data.qty_by_unit.slice(0, 4).map((u) => `${fmtQty(u.qty)} ${u.unit}`).join(' · ')}
             />
             <StatCard label="Aguardando SA" value={fmtInt(c.aguardando_sa)} unit="MEs" icon={<Hourglass className="h-5 w-5" />} tone="orange" to={withFilters({ status: ['aguardando_sa'] })} />
-            <StatCard label="SA informada" value={fmtInt(c.sa_informada)} unit="MEs" icon={<Hourglass className="h-5 w-5" />} tone="blue" to={withFilters({ status: ['sa_informada'] })} />
+            <StatCard label="Aguardando baixa no ERP" value={fmtInt(c.sa_informada)} unit="MEs" icon={<Hourglass className="h-5 w-5" />} tone="blue" to={withFilters({ status: ['sa_informada'] })} />
             <StatCard label="Concluídas" value={fmtInt(c.concluida)} unit="MEs" icon={<CheckCheck className="h-5 w-5" />} tone="green" to={withFilters({ status: ['concluida'] })} />
             <StatCard label="Canceladas" value={fmtInt(c.cancelada)} unit="MEs" icon={<Ban className="h-5 w-5" />} tone="red" to={withFilters({ status: ['cancelada'] })} />
             {c.aguardando_aprovacao > 0 && (

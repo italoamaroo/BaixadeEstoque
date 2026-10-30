@@ -77,7 +77,7 @@ export function SettingsPage() {
           <Checkbox label="Exigir aprovação do gestor" description="A ME fica “Aguardando aprovação” antes de seguir para a SA." checked={s.require_approval} onChange={(v) => set('require_approval', v)} />
           <Checkbox label="Permitir quantidade atendida maior que a solicitada" checked={s.allow_delivered_above_requested} onChange={(v) => set('allow_delivered_above_requested', v)} />
           <Checkbox label="Permitir o mesmo material em linhas separadas na ME" description="Se desligado, leituras repetidas somam na mesma linha." checked={s.allow_duplicate_material_lines} onChange={(v) => set('allow_duplicate_material_lines', v)} />
-          <Checkbox label="Concluir a ME automaticamente ao informar a SA" checked={s.auto_complete_on_sa} onChange={(v) => set('auto_complete_on_sa', v)} />
+          <Checkbox label="Concluir a ME automaticamente ao informar a SA (dispensa a confirmação da baixa no ERP pelo almoxarife)" checked={s.auto_complete_on_sa} onChange={(v) => set('auto_complete_on_sa', v)} />
         </div>
       </Card>
       <Card>

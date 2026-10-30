@@ -167,7 +167,17 @@ export const informSa = (id: string, sa: string, justification?: string) =>
     p_sa_number: sa,
     p_justification: justification ?? null,
   });
-export const completeMovement = (id: string) => rpc<unknown>('complete_movement', { p_id: id });
+/** Almoxarife confirma que fez a baixa no ERP com a SA informada (ME vai para Concluída). */
+export const completeMovement = (id: string, erpDocument?: string, notes?: string) =>
+  rpc<{ id: string; status: string; sa_number: string }>('complete_movement', {
+    p_id: id,
+    p_erp_document: erpDocument?.trim() || null,
+    p_notes: notes?.trim() || null,
+  });
+export async function getMovementItems(id: string): Promise<MovementItem[]> {
+  const r = await supabase.from('stock_movement_items').select('*').eq('movement_id', id).order('line_number');
+  return (unwrap(r) ?? []) as MovementItem[];
+}
 export const cancelMovement = (id: string, reason: string) => rpc<unknown>('cancel_movement', { p_id: id, p_reason: reason });
 export const correctMovement = (id: string, changes: Record<string, unknown>, justification: string) =>
   rpc<unknown>('correct_movement', { p_id: id, p_changes: changes, p_justification: justification });

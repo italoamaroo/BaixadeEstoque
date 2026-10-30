@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCheck, Hourglass, Search } from 'lucide-react';
-import { toast } from 'sonner';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { InformSaModal } from '@/components/InformSaModal';
+import { ErpBaixaModal } from '@/components/ErpBaixaModal';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Alert, EmptyState, PageHeader } from '@/components/ui/Card';
 import { Pagination } from '@/components/ui/Pagination';
 import { PageLoader } from '@/components/ui/Spinner';
-import { completeMovement, searchMovements, type SearchResult } from '@/lib/api';
+import { searchMovements, type SearchResult } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
 import { daysSince, fmtDateTime } from '@/lib/format';
 import { EMPTY_FILTERS } from '@/lib/filters';
@@ -27,7 +27,8 @@ function AgeBadge({ since }: { since: string }) {
 
 export function SaPendingPage() {
   const { warehouses, can } = useAuth();
-  const [tab, setTab] = useState<Tab>('aguardando_sa');
+  // almoxarife (sem perfil de SA) abre direto nas baixas pendentes no ERP
+  const [tab, setTab] = useState<Tab>(() => (can('informSa') ? 'aguardando_sa' : 'sa_informada'));
   const [warehouseId, setWarehouseId] = useState('');
   const [q, setQ] = useState('');
   const [query, setQuery] = useState('');
@@ -37,7 +38,7 @@ export function SaPendingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [target, setTarget] = useState<MovementRow | null>(null);
-  const [completing, setCompleting] = useState<string | null>(null);
+  const [erpTarget, setErpTarget] = useState<MovementRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,30 +64,19 @@ export function SaPendingPage() {
   }, [load]);
   useRealtimeMovements(() => void load());
 
-  const complete = async (m: MovementRow) => {
-    if (completing) return;
-    setCompleting(m.id);
-    try {
-      await completeMovement(m.id);
-      toast.success(`${m.me_number} concluída.`);
-      void load();
-    } catch (err) {
-      toast.error(errorMessage(err));
-    } finally {
-      setCompleting(null);
-    }
-  };
-
   return (
     <div>
-      <PageHeader title="Pendências de SA" subtitle="MEs aguardando o lançamento no ERP e o número da SA. As mais antigas aparecem primeiro." />
+      <PageHeader
+        title="Pendências de SA e baixa no ERP"
+        subtitle="1) A equipe de SA informa o número da SA. 2) O almoxarife faz a baixa no ERP com essa SA e confirma aqui. As mais antigas aparecem primeiro."
+      />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-xl bg-slate-100 p-1">
           {(
             [
               ['aguardando_sa', 'Aguardando SA'],
-              ['sa_informada', 'SA informada (a concluir)'],
+              ['sa_informada', 'Aguardando baixa no ERP'],
             ] as [Tab, string][]
           ).map(([k, label]) => (
             <button
@@ -147,7 +137,7 @@ export function SaPendingPage() {
         ) : data && data.rows.length === 0 ? (
           <EmptyState
             icon={<CheckCheck className="h-10 w-10 text-emerald-500" />}
-            title={tab === 'aguardando_sa' ? 'Nenhuma ME aguardando SA' : 'Nenhuma ME aguardando conclusão'}
+            title={tab === 'aguardando_sa' ? 'Nenhuma ME aguardando SA' : 'Nenhuma ME aguardando baixa no ERP'}
             description="Tudo em dia para os filtros selecionados."
           />
         ) : data ? (
@@ -162,7 +152,7 @@ export function SaPendingPage() {
                       </Link>
                       <Badge className="bg-slate-100 text-slate-700 ring-slate-300">{m.warehouse_name}</Badge>
                       <AgeBadge since={tab === 'aguardando_sa' ? m.movement_at : (m.sa_informed_at ?? m.movement_at)} />
-                      {m.sa_number && <span className="font-mono text-xs text-slate-600">SA {m.sa_number}</span>}
+                      {m.sa_number && <span className="rounded bg-brand-50 px-2 py-0.5 font-mono text-sm font-bold text-brand-800">SA {m.sa_number}</span>}
                     </div>
                     <p className="mt-1 text-sm text-slate-900">
                       {m.requester_name} <span className="text-slate-500">· {m.item_count} {m.item_count === 1 ? 'item' : 'itens'}</span>
@@ -182,12 +172,14 @@ export function SaPendingPage() {
                       )
                     ) : (
                       <>
-                        <Button variant="secondary" onClick={() => setTarget(m)}>
-                          Corrigir SA
-                        </Button>
+                        {can('informSa') && (
+                          <Button variant="secondary" onClick={() => setTarget(m)}>
+                            Corrigir SA
+                          </Button>
+                        )}
                         {can('completeMovement') && (
-                          <Button variant="success" icon={<CheckCheck className="h-4 w-4" />} loading={completing === m.id} onClick={() => void complete(m)}>
-                            Concluir
+                          <Button variant="success" icon={<CheckCheck className="h-4 w-4" />} onClick={() => setErpTarget(m)}>
+                            Confirmar baixa no ERP
                           </Button>
                         )}
                       </>
@@ -202,6 +194,7 @@ export function SaPendingPage() {
       </div>
 
       <InformSaModal movement={target} onClose={() => setTarget(null)} onDone={() => void load()} />
+      <ErpBaixaModal movement={erpTarget} onClose={() => setErpTarget(null)} onDone={() => void load()} />
     </div>
   );
 }

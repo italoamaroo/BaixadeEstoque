@@ -36,7 +36,7 @@ const OPERATION: NavItem[] = [
   { to: '/', label: 'Painel', icon: <BarChart3 className="h-5 w-5" /> },
   { to: '/nova-saida', label: 'Nova saída', icon: <PackageMinus className="h-5 w-5" />, perm: 'createMovement' },
   { to: '/movimentacoes', label: 'Movimentações', icon: <ClipboardList className="h-5 w-5" /> },
-  { to: '/pendencias-sa', label: 'Pendências de SA', icon: <Hourglass className="h-5 w-5" />, perm: 'informSa' },
+  { to: '/pendencias-sa', label: 'Pendências SA / ERP', icon: <Hourglass className="h-5 w-5" />, perm: 'viewPending' },
   { to: '/exportar', label: 'Exportar Excel/PDF', icon: <FileSpreadsheet className="h-5 w-5" />, perm: 'exportExcel' },
 ];
 
@@ -192,7 +192,7 @@ function BottomNav() {
     { to: '/', label: 'Painel', icon: <BarChart3 className="h-5 w-5" /> },
     ...(can('createMovement') ? [{ to: '/nova-saida', label: 'Nova saída', icon: <PackageMinus className="h-6 w-6" />, primary: true }] : []),
     { to: '/movimentacoes', label: 'MEs', icon: <ClipboardList className="h-5 w-5" /> },
-    ...(can('informSa') ? [{ to: '/pendencias-sa', label: 'SA', icon: <Hourglass className="h-5 w-5" /> }] : []),
+    ...(can('viewPending') ? [{ to: '/pendencias-sa', label: can('informSa') ? 'SA' : 'ERP', icon: <Hourglass className="h-5 w-5" /> }] : []),
   ];
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden print:hidden">

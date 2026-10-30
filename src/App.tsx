@@ -51,7 +51,7 @@ function AppRoutes() {
               <Route path="nova-saida" element={<RequirePermission perm="createMovement"><NewMovementPage /></RequirePermission>} />
               <Route path="movimentacoes" element={<MovementsPage />} />
               <Route path="movimentacoes/:id" element={<MovementDetailPage />} />
-              <Route path="pendencias-sa" element={<RequirePermission perm="informSa"><SaPendingPage /></RequirePermission>} />
+              <Route path="pendencias-sa" element={<RequirePermission perm="viewPending"><SaPendingPage /></RequirePermission>} />
               <Route path="exportar" element={<RequirePermission perm="exportExcel"><ExportPage /></RequirePermission>} />
 
               <Route path="cadastros/materiais" element={<RequirePermission perm="manageMasterData"><MaterialsPage /></RequirePermission>} />
