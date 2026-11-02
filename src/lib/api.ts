@@ -318,6 +318,12 @@ export const importMaterials = (rows: Record<string, unknown>[]) =>
     p_rows: rows,
   });
 
+/** Importa ativos fixos, locais de aplicação e demais cadastros auxiliares (atualiza pelo código). */
+export const importLookups = (table: LookupTable, rows: Record<string, unknown>[]) =>
+  rpc<{ inseridos: number; atualizados: number; erros: { linha: number; codigo: string; erro: string }[] }>('import_lookups', {
+    p_table: table,
+    p_rows: rows,
+  });
 export const importEmployees = (rows: Record<string, unknown>[]) =>
   rpc<{ inseridos: number; atualizados: number; erros: { linha: number; codigo: string; erro: string }[] }>('import_employees', {
     p_rows: rows,

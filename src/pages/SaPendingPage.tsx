@@ -68,7 +68,7 @@ export function SaPendingPage() {
     <div>
       <PageHeader
         title="Pendências de SA e baixa no ERP"
-        subtitle="1) A equipe de SA informa o número da SA. 2) O almoxarife faz a baixa no ERP com essa SA e confirma aqui. As mais antigas aparecem primeiro."
+        subtitle="ME com ativo fixo: 1) a equipe de SA informa o número da SA; 2) o almoxarife faz a baixa no ERP com essa SA. ME sem ativo fixo vai direto para a baixa no ERP, sem SA. As mais antigas aparecem primeiro."
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -152,7 +152,13 @@ export function SaPendingPage() {
                       </Link>
                       <Badge className="bg-slate-100 text-slate-700 ring-slate-300">{m.warehouse_name}</Badge>
                       <AgeBadge since={tab === 'aguardando_sa' ? m.movement_at : (m.sa_informed_at ?? m.movement_at)} />
-                      {m.sa_number && <span className="rounded bg-brand-50 px-2 py-0.5 font-mono text-sm font-bold text-brand-800">SA {m.sa_number}</span>}
+                      {m.sa_number ? (
+                        <span className="rounded bg-brand-50 px-2 py-0.5 font-mono text-sm font-bold text-brand-800">SA {m.sa_number}</span>
+                      ) : (
+                        tab === 'sa_informada' && (
+                          <Badge className="bg-violet-50 text-violet-800 ring-violet-300">Sem ativo fixo · direto no ERP, sem SA</Badge>
+                        )
+                      )}
                     </div>
                     <p className="mt-1 text-sm text-slate-900">
                       {m.requester_name} <span className="text-slate-500">· {m.item_count} {m.item_count === 1 ? 'item' : 'itens'}</span>
@@ -172,7 +178,7 @@ export function SaPendingPage() {
                       )
                     ) : (
                       <>
-                        {can('informSa') && (
+                        {can('informSa') && m.sa_number && (
                           <Button variant="secondary" onClick={() => setTarget(m)}>
                             Corrigir SA
                           </Button>

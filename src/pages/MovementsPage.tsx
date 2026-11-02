@@ -189,7 +189,7 @@ export function MovementsPage() {
                           <button type="button" title="Visualizar" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand-700" onClick={() => navigate(`/movimentacoes/${m.id}`)}>
                             <Eye className="h-4 w-4" />
                           </button>
-                          {can('informSa') && ['aguardando_sa', 'sa_informada'].includes(m.status) && (
+                          {can('informSa') && (m.status === 'aguardando_sa' || (m.status === 'sa_informada' && m.sa_number)) && (
                             <button type="button" title={m.sa_number ? 'Corrigir SA' : 'Informar SA'} className="rounded-md p-1.5 text-orange-600 hover:bg-orange-50" onClick={() => setSaTarget(m)}>
                               <Hourglass className="h-4 w-4" />
                             </button>

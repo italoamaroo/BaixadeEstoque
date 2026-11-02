@@ -167,7 +167,9 @@ export function MovementDetailPage() {
 
   const m = detail.movement;
   const isCancelled = m.status === 'cancelada';
-  const beforeSa = m.status === 'aguardando_sa' || m.status === 'aguardando_aprovacao';
+  // antes do lançamento no ERP: aguardando SA/aprovação ou, em ME sem ativo fixo, aguardando a baixa (sem SA)
+  const beforeSa =
+    m.status === 'aguardando_sa' || m.status === 'aguardando_aprovacao' || (m.status === 'sa_informada' && !m.sa_number);
   // Almoxarife cancela (devolução) só antes do lançamento no ERP; gestor/admin em qualquer status.
   const canCancel = !isCancelled && (can('cancelMovement') || (can('cancelBeforeSa') && beforeSa));
 
@@ -256,7 +258,7 @@ export function MovementDetailPage() {
                   Aprovar
                 </Button>
               )}
-              {can('informSa') && (m.status === 'aguardando_sa' || m.status === 'sa_informada' || (m.status === 'concluida' && can('correctSaAfterCompletion'))) && (
+              {can('informSa') && (m.status === 'aguardando_sa' || (m.sa_number && (m.status === 'sa_informada' || (m.status === 'concluida' && can('correctSaAfterCompletion'))))) && (
                 <Button variant={m.status === 'aguardando_sa' ? 'warning' : 'secondary'} icon={<Hourglass className="h-4 w-4" />} onClick={() => setModal('sa')}>
                   {m.status === 'aguardando_sa' ? 'Informar SA' : 'Corrigir SA'}
                 </Button>

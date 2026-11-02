@@ -95,6 +95,11 @@ export function StepDetails({ draft, update, next, back }: StepProps) {
             list="af-list"
             maxLength={40}
             error={errors.fixed_asset_text}
+            hint={
+              (d.fixed_asset_text ?? '').trim()
+                ? 'Com ativo fixo: a ME vai para a equipe de SA e depois para a baixa no ERP.'
+                : 'Sem ativo fixo: a ME não passa pela SA, vai direto para o almoxarifado lançar no ERP.'
+            }
             inputSize="lg"
           />
           <datalist id="af-list">
