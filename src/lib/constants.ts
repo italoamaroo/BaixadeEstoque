@@ -1,8 +1,8 @@
 import type { AppRole, MovementStatus } from '@/types/db';
 
 export const STATUS_LABELS: Record<MovementStatus, string> = {
-  rascunho: 'Rascunho',
-  aguardando_assinatura: 'Aguardando assinatura',
+  rascunho: 'Em separação',
+  aguardando_assinatura: 'Aguardando confirmação',
   aguardando_aprovacao: 'Aguardando aprovação',
   aguardando_sa: 'Aguardando SA',
   sa_informada: 'Aguardando baixa no ERP',
@@ -34,6 +34,7 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   equipe_sa: 'Equipe de lançamento da SA',
   gestor: 'Gestor',
   admin: 'Administrador',
+  terminal: 'Terminal do solicitante (tablet do balcão)',
 };
 
 export const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
@@ -41,6 +42,7 @@ export const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
   equipe_sa: 'Consulta as MEs, acompanha pendências, informa e corrige o número da SA (com justificativa). A baixa no ERP fica com o almoxarife.',
   gestor: 'Painel gerencial, todas as consultas, assinaturas, histórico, exportação para Excel, aprovação, correção e cancelamento de MEs.',
   admin: 'Tudo do almoxarife nos cadastros, mais usuários, perfis, estoques, parâmetros e auditoria.',
+  terminal: 'Usuário do tablet do balcão: acompanha somente a ME com que foi pareado e coleta a confirmação do solicitante. Não vê outras MEs. Vincule ao estoque do balcão.',
 };
 
 /** Ações da interface por perfil. A mesma regra existe no banco (RLS + RPC). */
@@ -57,6 +59,9 @@ export const PERMISSIONS = {
   replaceSignature: ['gestor', 'admin'],
   exportExcel: ['equipe_sa', 'gestor', 'admin'],
   viewDashboard: ['gestor', 'admin', 'equipe_sa', 'almoxarife'],
+  viewMovements: ['gestor', 'admin', 'equipe_sa', 'almoxarife'],
+  useCounter: ['almoxarife', 'gestor', 'admin'],
+  counterTerminal: ['terminal'],
   viewAudit: ['gestor', 'admin'],
   printLabels: ['admin', 'gestor', 'almoxarife'],
   manageMasterData: ['admin', 'almoxarife'],
@@ -74,6 +79,11 @@ export function can(roles: readonly AppRole[], permission: Permission): boolean 
 
 export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'me.criada': 'ME criada',
+  'me.balcao_aberta': 'Separação aberta no balcão',
+  'me.separacao_finalizada': 'Separação finalizada',
+  'me.separacao_reaberta': 'Separação reaberta',
+  'me.confirmada': 'ME confirmada pelo solicitante',
+  'balcao.terminal_pareado': 'Tablet do solicitante pareado',
   'me.finalizada': 'ME finalizada',
   'me.alterada': 'ME alterada',
   'me.aprovada': 'ME aprovada',
@@ -127,6 +137,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   accounts: 'Conta',
   material_categories: 'Categoria',
   interface: 'Interface',
+  counter_sessions: 'Sessão do balcão',
 };
 
 export const LOOKUP_TABLES = [

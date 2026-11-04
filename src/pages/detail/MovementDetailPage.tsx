@@ -169,7 +169,11 @@ export function MovementDetailPage() {
   const isCancelled = m.status === 'cancelada';
   // antes do lançamento no ERP: aguardando SA/aprovação ou, em ME sem ativo fixo, aguardando a baixa (sem SA)
   const beforeSa =
-    m.status === 'aguardando_sa' || m.status === 'aguardando_aprovacao' || (m.status === 'sa_informada' && !m.sa_number);
+    m.status === 'rascunho' ||
+    m.status === 'aguardando_assinatura' ||
+    m.status === 'aguardando_sa' ||
+    m.status === 'aguardando_aprovacao' ||
+    (m.status === 'sa_informada' && !m.sa_number);
   // Almoxarife cancela (devolução) só antes do lançamento no ERP; gestor/admin em qualquer status.
   const canCancel = !isCancelled && (can('cancelMovement') || (can('cancelBeforeSa') && beforeSa));
 

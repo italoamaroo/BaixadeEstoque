@@ -13,6 +13,7 @@ import {
   Menu,
   PackageMinus,
   QrCode,
+  ScanLine,
   Settings,
   ShieldCheck,
   UserCog,
@@ -33,9 +34,10 @@ interface NavItem {
 }
 
 const OPERATION: NavItem[] = [
-  { to: '/', label: 'Painel', icon: <BarChart3 className="h-5 w-5" /> },
+  { to: '/', label: 'Painel', icon: <BarChart3 className="h-5 w-5" />, perm: 'viewDashboard' },
   { to: '/nova-saida', label: 'Nova saída', icon: <PackageMinus className="h-5 w-5" />, perm: 'createMovement' },
-  { to: '/movimentacoes', label: 'Movimentações', icon: <ClipboardList className="h-5 w-5" /> },
+  { to: '/balcao', label: 'Balcão (leitor + tablet)', icon: <ScanLine className="h-5 w-5" />, perm: 'useCounter' },
+  { to: '/movimentacoes', label: 'Movimentações', icon: <ClipboardList className="h-5 w-5" />, perm: 'viewMovements' },
   { to: '/pendencias-sa', label: 'Pendências SA / ERP', icon: <Hourglass className="h-5 w-5" />, perm: 'viewPending' },
   { to: '/exportar', label: 'Exportar Excel/PDF', icon: <FileSpreadsheet className="h-5 w-5" />, perm: 'exportExcel' },
 ];

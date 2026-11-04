@@ -15,7 +15,7 @@ import { fmtDate } from '@/lib/format';
 import { newUserSchema } from '@/lib/validation';
 import type { AdminUser, AppRole, Warehouse } from '@/types/db';
 
-const ALL_ROLES: AppRole[] = ['almoxarife', 'equipe_sa', 'gestor', 'admin'];
+const ALL_ROLES: AppRole[] = ['almoxarife', 'equipe_sa', 'gestor', 'admin', 'terminal'];
 
 export function UsersPage() {
   const { userId, refreshAccess } = useAuth();

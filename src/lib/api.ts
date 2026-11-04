@@ -12,6 +12,7 @@ import type {
   Material,
   MovementItem,
   MovementRow,
+  MovementStatus,
   SaRecord,
   Settings,
   SignatureRecord,
@@ -432,3 +433,133 @@ export async function listAudit(q: AuditQuery): Promise<{ rows: AuditLog[]; tota
   if (error) throw toAppError(error);
   return { rows: (data ?? []) as AuditLog[], total: count ?? 0 };
 }
+
+// ---------------------------------------------------------------------------
+// Balcão de separação (leitor QR sem fio + tablet do solicitante)
+// ---------------------------------------------------------------------------
+export type CounterScanResult =
+  | 'incluido'
+  | 'somado'
+  | 'ja_incluido'
+  | 'nao_encontrado'
+  | 'invalido'
+  | 'inativo'
+  | 'quantidade_invalida';
+
+export interface CounterScanResponse {
+  result: CounterScanResult;
+  code: string | null;
+  item_id: string | null;
+  material_id: string | null;
+  material_code: string | null;
+  material_name: string | null;
+  unit: string | null;
+  quantity_requested: number | null;
+  quantity_delivered: number | null;
+  repetida?: boolean;
+}
+
+export type CounterSessionStatus = 'em_separacao' | 'aguardando_confirmacao' | 'confirmada' | 'cancelada';
+
+export interface CounterSnapshot {
+  session: {
+    id: string;
+    status: CounterSessionStatus;
+    version: number;
+    last_event: string | null;
+    last_event_at: string;
+    terminal_paired: boolean;
+    paired_at: string | null;
+    pairing_code: string | null;
+    pairing_expires_at: string;
+    terminal_name: string | null;
+  };
+  movement: {
+    id: string;
+    me_number: string;
+    status: MovementStatus;
+    warehouse_name: string;
+    warehouse_code: string;
+    requester_name: string;
+    requester_registration: string;
+    storekeeper_name: string;
+    movement_at: string;
+    separation_finished_at: string | null;
+    confirmed_at: string | null;
+    cancel_reason: string | null;
+    item_count: number;
+    total_delivered: number;
+    fixed_asset: string | null;
+  };
+  items: {
+    id: string;
+    line_number: number;
+    material_code: string;
+    material_name: string;
+    unit: string;
+    quantity_requested: number;
+    quantity_delivered: number;
+    created_at: string;
+    updated_at: string;
+  }[];
+}
+
+export interface CounterOpenPayload {
+  id: string;
+  warehouse_id: string;
+  contract_id: string;
+  sector_id: string;
+  service_front_id?: string | null;
+  service_order_text?: string | null;
+  fixed_asset_text?: string | null;
+  application_location_id?: string | null;
+  notes?: string | null;
+  requester_employee_id: string;
+  reuse_terminal?: boolean;
+}
+
+export const counterOpen = (payload: CounterOpenPayload) =>
+  rpc<{ id: string; me_number: string; session_id: string; pairing_code: string; terminal_paired: boolean; created: boolean }>(
+    'counter_open',
+    { p_payload: payload },
+  );
+
+export const counterAdd = (payload: {
+  movement_id: string;
+  scan_id: string;
+  code?: string;
+  material_id?: string;
+  quantity?: number;
+  on_duplicate?: 'avisar' | 'somar' | 'nova_linha';
+}) => rpc<CounterScanResponse>('counter_add', { p_payload: payload });
+
+export const counterSetQuantity = (itemId: string, requested: number, delivered: number) =>
+  rpc<unknown>('counter_set_quantity', { p_item_id: itemId, p_requested: requested, p_delivered: delivered });
+export const counterRemoveItem = (itemId: string) => rpc<unknown>('counter_remove_item', { p_item_id: itemId });
+export const counterFinish = (movementId: string) => rpc<unknown>('counter_finish', { p_movement_id: movementId });
+export const counterReopen = (movementId: string, reason?: string) =>
+  rpc<unknown>('counter_reopen', { p_movement_id: movementId, p_reason: reason ?? null });
+export const counterNewPairingCode = (movementId: string) =>
+  rpc<{ pairing_code: string }>('counter_new_pairing_code', { p_movement_id: movementId });
+export const counterPair = (code: string) => rpc<{ session_id: string; movement_id: string }>('counter_pair', { p_code: code });
+export const counterSnapshot = (movementId?: string | null) =>
+  rpc<CounterSnapshot | null>('counter_snapshot', { p_movement_id: movementId ?? null });
+export const counterRegisterAttempt = (movementId: string, method: 'assinatura' | 'facial', result: 'falha' | 'cancelada' | 'erro', detail?: Record<string, unknown>) =>
+  rpc<string>('counter_register_attempt', { p_movement_id: movementId, p_method: method, p_result: result, p_detail: detail ?? null });
+export const counterConfirm = (
+  movementId: string,
+  payload: { method: 'assinatura'; signature_path: string } | { method: 'facial'; verification_id: string },
+) => rpc<{ id: string; me_number: string; status: MovementStatus }>('counter_confirm', { p_movement_id: movementId, p_payload: payload });
+export const counterMyOpen = () =>
+  rpc<
+    {
+      movement_id: string;
+      me_number: string;
+      status: MovementStatus;
+      requester_name: string;
+      item_count: number;
+      created_at: string;
+      terminal_paired: boolean;
+      warehouse_name: string;
+    }[]
+  >('counter_my_open');

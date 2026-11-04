@@ -1,4 +1,4 @@
-export type AppRole = 'almoxarife' | 'equipe_sa' | 'gestor' | 'admin';
+export type AppRole = 'almoxarife' | 'equipe_sa' | 'gestor' | 'admin' | 'terminal';
 
 export type MovementStatus =
   | 'rascunho'

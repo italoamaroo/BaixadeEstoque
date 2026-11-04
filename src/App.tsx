@@ -28,11 +28,20 @@ const LookupsPage = lazy(() => import('@/pages/admin/LookupsPage').then((m) => (
 const UsersPage = lazy(() => import('@/pages/admin/UsersPage').then((m) => ({ default: m.UsersPage })));
 const RolesPage = lazy(() => import('@/pages/admin/RolesPage').then((m) => ({ default: m.RolesPage })));
 const AuditPage = lazy(() => import('@/pages/admin/AuditPage').then((m) => ({ default: m.AuditPage })));
+const CounterPage = lazy(() => import('@/pages/counter/CounterPage').then((m) => ({ default: m.CounterPage })));
+const TerminalPage = lazy(() => import('@/pages/counter/TerminalPage').then((m) => ({ default: m.TerminalPage })));
 const SettingsPage = lazy(() => import('@/pages/admin/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 
 function RecoveryRedirect() {
   const { recoveryMode } = useAuth();
   return recoveryMode ? <Navigate to="/redefinir-senha" replace /> : null;
+}
+
+/** Usuário só com perfil Terminal vai direto para a tela do tablet. */
+function HomeRoute() {
+  const { roles } = useAuth();
+  if (roles.length > 0 && roles.every((r) => r === 'terminal')) return <Navigate to="/terminal" replace />;
+  return <DashboardPage />;
 }
 
 function AppRoutes() {
@@ -46,11 +55,14 @@ function AppRoutes() {
           <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
 
           <Route element={<ProtectedRoute />}>
+            <Route path="terminal" element={<RequirePermission perm="counterTerminal"><TerminalPage /></RequirePermission>} />
             <Route element={<AppLayout />}>
-              <Route index element={<DashboardPage />} />
+              <Route index element={<HomeRoute />} />
+              <Route path="balcao" element={<RequirePermission perm="useCounter"><CounterPage /></RequirePermission>} />
+              <Route path="balcao/:id" element={<RequirePermission perm="useCounter"><CounterPage /></RequirePermission>} />
               <Route path="nova-saida" element={<RequirePermission perm="createMovement"><NewMovementPage /></RequirePermission>} />
-              <Route path="movimentacoes" element={<MovementsPage />} />
-              <Route path="movimentacoes/:id" element={<MovementDetailPage />} />
+              <Route path="movimentacoes" element={<RequirePermission perm="viewMovements"><MovementsPage /></RequirePermission>} />
+              <Route path="movimentacoes/:id" element={<RequirePermission perm="viewMovements"><MovementDetailPage /></RequirePermission>} />
               <Route path="pendencias-sa" element={<RequirePermission perm="viewPending"><SaPendingPage /></RequirePermission>} />
               <Route path="exportar" element={<RequirePermission perm="exportExcel"><ExportPage /></RequirePermission>} />
 

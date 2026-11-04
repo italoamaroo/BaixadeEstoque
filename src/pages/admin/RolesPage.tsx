@@ -6,7 +6,7 @@ import { adminListUsers } from '@/lib/api';
 import { PERMISSIONS, ROLE_DESCRIPTIONS, ROLE_LABELS, type Permission } from '@/lib/constants';
 import type { AppRole } from '@/types/db';
 
-const ROLES: AppRole[] = ['almoxarife', 'equipe_sa', 'gestor', 'admin'];
+const ROLES: AppRole[] = ['almoxarife', 'equipe_sa', 'gestor', 'admin', 'terminal'];
 
 const PERMISSION_LABELS: Record<Permission, string> = {
   createMovement: 'Registrar saída (ler QR, montar ME, coletar assinatura)',
@@ -21,6 +21,9 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   replaceSignature: 'Coletar nova assinatura (mantém a anterior)',
   exportExcel: 'Exportar para Excel',
   viewDashboard: 'Painel e consultas dos estoques autorizados',
+  viewMovements: 'Lista e detalhes das MEs dos estoques autorizados',
+  useCounter: 'Balcão: separar com leitor sem fio e acompanhar no tablet',
+  counterTerminal: 'Tablet do solicitante (somente a ME pareada)',
   viewAudit: 'Consultar auditoria',
   printLabels: 'Imprimir etiquetas QR Code',
   manageMasterData: 'Cadastros de materiais, QR Codes, funcionários e tabelas auxiliares (incluir, editar, importar)',
