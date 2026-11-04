@@ -1,17 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScanLine } from 'lucide-react';
 import { useLookups } from '@/hooks/useLookups';
 import { useWarehouse } from '@/contexts/WarehouseContext';
 import { EmployeePicker } from '@/components/EmployeePicker';
 import { Button } from '@/components/ui/Button';
-import { Checkbox, Input, Select, Textarea } from '@/components/ui/Field';
+import { Input, Select, Textarea } from '@/components/ui/Field';
 import { Alert, Card } from '@/components/ui/Card';
 import { PageLoader } from '@/components/ui/Spinner';
-import { counterOpen } from '@/lib/api';
+import { counterListTerminals, counterOpen, suggestTerminal, type CounterTerminal } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
 import type { Employee } from '@/types/db';
 
-const REUSE_KEY = 'baixas-estoque:balcao-reusar-tablet';
 
 /** Abertura da separação no balcão: estoque, solicitante e dados da ME. */
 export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) => void }) {
@@ -27,13 +26,25 @@ export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) =
     application_location_id: '',
     notes: '',
   });
-  const [reuse, setReuse] = useState(() => {
-    try {
-      return localStorage.getItem(REUSE_KEY) !== 'nao';
-    } catch {
-      return true;
-    }
-  });
+  const [terminals, setTerminals] = useState<CounterTerminal[] | null>(null);
+  const [terminalId, setTerminalId] = useState('');
+
+  // tablets do estoque escolhido; sugere o último usado por mim (se livre) ou o primeiro livre
+  useEffect(() => {
+    if (!current) return;
+    let alive = true;
+    setTerminals(null);
+    counterListTerminals(current.id)
+      .then((list) => {
+        if (!alive) return;
+        setTerminals(list);
+        setTerminalId(suggestTerminal(list));
+      })
+      .catch(() => alive && setTerminals([]));
+    return () => {
+      alive = false;
+    };
+  }, [current]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -55,11 +66,6 @@ export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) =
     setBusy(true);
     setServerError(null);
     try {
-      try {
-        localStorage.setItem(REUSE_KEY, reuse ? 'sim' : 'nao');
-      } catch {
-        /* ignore */
-      }
       const r = await counterOpen({
         id: movementId,
         warehouse_id: current.id,
@@ -71,7 +77,7 @@ export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) =
         application_location_id: f.application_location_id || null,
         notes: f.notes || null,
         requester_employee_id: requester.id,
-        reuse_terminal: reuse,
+        terminal_user_id: terminalId || null,
       });
       onOpened(r.id);
     } catch (e) {
@@ -171,14 +177,28 @@ export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) =
           ))}
         </Select>
         <Textarea label="Observações" value={f.notes} onChange={(e) => set('notes', e.target.value)} maxLength={2000} rows={2} wrapClassName="sm:col-span-2" />
-        <div className="sm:col-span-2">
-          <Checkbox
-            label="Usar o mesmo tablet da separação anterior"
-            description="Se o tablet estiver livre, ele passa a mostrar esta ME sem precisar digitar o código."
-            checked={reuse}
-            onChange={setReuse}
-          />
-        </div>
+        <Select
+          label="Tablet do solicitante"
+          value={terminalId}
+          onChange={(e) => setTerminalId(e.target.value)}
+          inputSize="lg"
+          wrapClassName="sm:col-span-2"
+          hint={
+            terminals === null
+              ? 'Carregando tablets…'
+              : terminals.length === 0
+                ? 'Nenhum tablet cadastrado para este estoque (crie um usuário com o perfil Terminal). Dá para conectar depois pelo código.'
+                : 'A separação aparece sozinha no tablet escolhido, sem digitar código.'
+          }
+        >
+          <option value="">Sem tablet agora (conectar depois pelo código)</option>
+          {(terminals ?? []).map((t) => (
+            <option key={t.user_id} value={t.user_id} disabled={Boolean(t.busy_me_number)}>
+              {t.name}
+              {t.busy_me_number ? ` — ocupado (${t.busy_me_number})` : ' — livre'}
+            </option>
+          ))}
+        </Select>
       </div>
       {serverError && (
         <div className="mt-4">

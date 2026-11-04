@@ -515,6 +515,7 @@ export interface CounterOpenPayload {
   application_location_id?: string | null;
   notes?: string | null;
   requester_employee_id: string;
+  terminal_user_id?: string | null;
   reuse_terminal?: boolean;
 }
 
@@ -563,3 +564,21 @@ export const counterMyOpen = () =>
       warehouse_name: string;
     }[]
   >('counter_my_open');
+
+export interface CounterTerminal {
+  user_id: string;
+  name: string;
+  busy_me_number: string | null;
+  last_used_by_me: string | null;
+}
+export const counterListTerminals = (warehouseId: string) =>
+  rpc<CounterTerminal[]>('counter_list_terminals', { p_warehouse_id: warehouseId });
+export const counterSetTerminal = (movementId: string, terminalUserId: string | null) =>
+  rpc<unknown>('counter_set_terminal', { p_movement_id: movementId, p_terminal_user_id: terminalUserId });
+
+/** Tablet sugerido: o último usado por mim (se livre); senão o primeiro livre. */
+export function suggestTerminal(list: CounterTerminal[]): string {
+  const free = list.filter((t) => !t.busy_me_number);
+  const mine = [...free].filter((t) => t.last_used_by_me).sort((a, b) => (b.last_used_by_me ?? '').localeCompare(a.last_used_by_me ?? ''));
+  return mine[0]?.user_id ?? free[0]?.user_id ?? '';
+}

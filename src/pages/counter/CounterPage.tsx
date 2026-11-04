@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWarehouse } from '@/contexts/WarehouseContext';
 import { useCounterSession } from '@/hooks/useCounterSession';
 import { normalizeScannedCode, useHidScanner } from '@/hooks/useHidScanner';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
@@ -31,6 +32,9 @@ import {
   counterRemoveItem,
   counterReopen,
   counterSetQuantity,
+  counterListTerminals,
+  counterSetTerminal,
+  type CounterTerminal,
   type CounterScanResponse,
   type CounterSnapshot,
 } from '@/lib/api';
@@ -109,6 +113,7 @@ function ActiveCounter({ movementId, onNew }: { movementId: string; onNew: () =>
   const { userId } = useAuth();
   const online = useOnlineStatus();
   const { snapshot, loading, error, live, refresh } = useCounterSession({ mode: 'movement', movementId });
+  const { options: warehouseOptions } = useWarehouse();
   const inputRef = useRef<HTMLInputElement>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [pending, setPending] = useState(0);
@@ -257,6 +262,7 @@ function ActiveCounter({ movementId, onNew }: { movementId: string; onNew: () =>
   const items = snapshot.items;
   const isOwner = true; // o banco recusa alterações de quem não abriu a separação
   void userId;
+  const warehouseId = warehouseOptions.find((w) => w.code === m.warehouse_code)?.id ?? null;
   const totalQty = items.reduce((acc, i) => acc + Number(i.quantity_delivered), 0);
 
   const run = async (fn: () => Promise<unknown>, ok?: string) => {
@@ -291,7 +297,13 @@ function ActiveCounter({ movementId, onNew }: { movementId: string; onNew: () =>
         }
       />
 
-      <TerminalCard snapshot={snapshot} busy={busy} onNewCode={() => void run(() => counterNewPairingCode(m.id), 'Novo código gerado.')} />
+      <TerminalCard
+        snapshot={snapshot}
+        warehouseId={warehouseId}
+        busy={busy}
+        onNewCode={() => void run(() => counterNewPairingCode(m.id), 'Novo código gerado.')}
+        onChanged={() => void refresh()}
+      />
 
       {separating && (
         <Card>
@@ -565,11 +577,49 @@ function ActiveCounter({ movementId, onNew }: { movementId: string; onNew: () =>
   );
 }
 
-function TerminalCard({ snapshot, busy, onNewCode }: { snapshot: CounterSnapshot; busy: boolean; onNewCode: () => void }) {
+function TerminalCard({
+  snapshot,
+  warehouseId,
+  busy,
+  onNewCode,
+  onChanged,
+}: {
+  snapshot: CounterSnapshot;
+  warehouseId: string | null;
+  busy: boolean;
+  onNewCode: () => void;
+  onChanged: () => void;
+}) {
   const s = snapshot.session;
+  const [choosing, setChoosing] = useState(false);
+  const [terminals, setTerminals] = useState<CounterTerminal[] | null>(null);
+  const [saving, setSaving] = useState(false);
   const active = s.status === 'em_separacao' || s.status === 'aguardando_confirmacao';
+
+  useEffect(() => {
+    if (!choosing || !warehouseId) return;
+    counterListTerminals(warehouseId)
+      .then(setTerminals)
+      .catch(() => setTerminals([]));
+  }, [choosing, warehouseId]);
+
   if (!active) return null;
   const expired = new Date(s.pairing_expires_at).getTime() < Date.now();
+
+  const choose = async (id: string) => {
+    setSaving(true);
+    try {
+      await counterSetTerminal(snapshot.movement.id, id || null);
+      toast.success(id ? 'Tablet ligado a esta separação.' : 'Tablet desconectado.');
+      setChoosing(false);
+      onChanged();
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -582,21 +632,57 @@ function TerminalCard({ snapshot, busy, onNewCode }: { snapshot: CounterSnapshot
             <p className="text-sm text-slate-500">
               {s.terminal_paired
                 ? 'O solicitante está acompanhando esta separação em tempo real.'
-                : 'No tablet do solicitante, digite o código ao lado (válido por 30 minutos).'}
+                : 'Escolha o tablet do solicitante ou digite o código no tablet.'}
             </p>
           </div>
         </div>
-        {!s.terminal_paired && (
-          <div className="flex items-center gap-3">
-            <p className={clsx('select-all font-mono text-4xl font-black tracking-[0.3em]', expired ? 'text-slate-300 line-through' : 'text-brand-800')}>
-              {s.pairing_code}
-            </p>
-            <Button variant="secondary" icon={<RotateCcw className="h-4 w-4" />} loading={busy} onClick={onNewCode}>
-              {expired ? 'Gerar novo código' : 'Novo código'}
-            </Button>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {!s.terminal_paired && (
+            <span className="flex items-center gap-2 text-sm text-slate-500">
+              código
+              <span className={clsx('select-all font-mono text-2xl font-black tracking-[0.25em]', expired ? 'text-slate-300 line-through' : 'text-brand-800')}>
+                {s.pairing_code}
+              </span>
+              <Button variant="ghost" size="sm" icon={<RotateCcw className="h-4 w-4" />} loading={busy} onClick={onNewCode}>
+                {expired ? 'Gerar novo' : 'Novo'}
+              </Button>
+            </span>
+          )}
+          <Button variant={s.terminal_paired ? 'secondary' : 'primary'} icon={<Tablet className="h-4 w-4" />} onClick={() => setChoosing((v) => !v)}>
+            {s.terminal_paired ? 'Trocar tablet' : 'Escolher tablet'}
+          </Button>
+        </div>
       </div>
+      {choosing && (
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+          {terminals === null ? (
+            <Spinner />
+          ) : terminals.length === 0 ? (
+            <p className="text-sm text-slate-500">Nenhum tablet cadastrado para este estoque.</p>
+          ) : (
+            terminals.map((t) => {
+              const current = s.terminal_name === t.name && s.terminal_paired;
+              const busyElsewhere = Boolean(t.busy_me_number) && t.busy_me_number !== snapshot.movement.me_number;
+              return (
+                <Button
+                  key={t.user_id}
+                  variant={current ? 'success' : 'secondary'}
+                  disabled={busyElsewhere || saving || current}
+                  onClick={() => void choose(t.user_id)}
+                >
+                  {t.name}
+                  {current ? ' (conectado)' : busyElsewhere ? ` — ocupado (${t.busy_me_number})` : ' — livre'}
+                </Button>
+              );
+            })
+          )}
+          {s.terminal_paired && (
+            <Button variant="ghost" disabled={saving} onClick={() => void choose('')}>
+              Desconectar tablet
+            </Button>
+          )}
+        </div>
+      )}
     </Card>
   );
 }
