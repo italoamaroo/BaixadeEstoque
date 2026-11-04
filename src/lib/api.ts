@@ -582,3 +582,33 @@ export function suggestTerminal(list: CounterTerminal[]): string {
   const mine = [...free].filter((t) => t.last_used_by_me).sort((a, b) => (b.last_used_by_me ?? '').localeCompare(a.last_used_by_me ?? ''));
   return mine[0]?.user_id ?? free[0]?.user_id ?? '';
 }
+
+// ---------------------------------------------------------------------------
+// Alerta: mesmo ativo fixo retirando o mesmo material em poucos dias
+// ---------------------------------------------------------------------------
+export interface RepeatAssetWithdrawal {
+  asset: string;
+  asset_name: string | null;
+  material_id: string;
+  material_code: string;
+  material_name: string;
+  unit: string;
+  times: number;
+  total_qty: number;
+  min_gap_days: number;
+  last_at: string;
+  occurrences: {
+    movement_id: string;
+    me_number: string;
+    movement_at: string;
+    warehouse: string;
+    requester: string;
+    quantity: number;
+    status: MovementStatus;
+  }[];
+}
+export const getRepeatAssetWithdrawals = (filters: Partial<MovementFilters>, days = 7) =>
+  rpc<{ days: number; total: number; items: RepeatAssetWithdrawal[] }>('repeat_asset_withdrawals', {
+    p_filters: toRpcFilters(filters),
+    p_days: days,
+  });

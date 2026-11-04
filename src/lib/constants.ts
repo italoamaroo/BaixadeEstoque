@@ -63,6 +63,7 @@ export const PERMISSIONS = {
   useCounter: ['almoxarife', 'gestor', 'admin'],
   counterTerminal: ['terminal'],
   viewAudit: ['gestor', 'admin'],
+  viewRepeatAlerts: ['gestor', 'admin'],
   printLabels: ['admin', 'gestor', 'almoxarife'],
   manageMasterData: ['admin', 'almoxarife'],
   manageWarehouses: ['admin'],

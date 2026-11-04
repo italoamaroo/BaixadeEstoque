@@ -10,14 +10,15 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Ban, CalendarDays, CheckCheck, ClipboardList, Hourglass, Layers, PackageMinus, Scale, ShieldQuestion, Warehouse } from 'lucide-react';
+import { AlertTriangle, Ban, CalendarDays, CheckCheck, ClipboardList, Hourglass, Layers, PackageMinus, Scale, ShieldQuestion, Warehouse } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { FiltersPanel } from '@/components/FiltersPanel';
 import { LinkButton } from '@/components/ui/Button';
 import { Alert, Card, CardHeader, PageHeader } from '@/components/ui/Card';
 import { PageLoader } from '@/components/ui/Spinner';
-import { getDashboard } from '@/lib/api';
+import { getDashboard, getRepeatAssetWithdrawals, type RepeatAssetWithdrawal } from '@/lib/api';
+import { RepeatAssetCard } from '@/components/RepeatAssetCard';
 import { errorMessage } from '@/lib/errors';
 import { filtersFromSearchParams, filtersToSearchParams, type MovementFilters } from '@/lib/filters';
 import { fmtInt, fmtQty } from '@/lib/format';
@@ -53,6 +54,7 @@ function StatCard({ label, value, unit, icon, tone = 'slate', hint, to }: { labe
       </div>
     </div>
   );
+  if (to?.startsWith('#')) return <a href={to}>{body}</a>;
   return to ? <Link to={to}>{body}</Link> : body;
 }
 
@@ -87,6 +89,25 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [repeatDays, setRepeatDays] = useState(7);
+  const [repeat, setRepeat] = useState<{ total: number; items: RepeatAssetWithdrawal[] } | null>(null);
+  const [repeatLoading, setRepeatLoading] = useState(true);
+
+  const showRepeat = can('viewRepeatAlerts');
+  const loadRepeat = useCallback(async () => {
+    if (!showRepeat) return;
+    try {
+      setRepeat(await getRepeatAssetWithdrawals(filters, repeatDays));
+    } catch {
+      setRepeat(null);
+    } finally {
+      setRepeatLoading(false);
+    }
+  }, [filters, repeatDays, showRepeat]);
+  useEffect(() => {
+    setRepeatLoading(true);
+    void loadRepeat();
+  }, [loadRepeat]);
 
   const load = useCallback(async () => {
     try {
@@ -103,7 +124,10 @@ export function DashboardPage() {
     setLoading(true);
     void load();
   }, [load]);
-  useRealtimeMovements(() => void load());
+  useRealtimeMovements(() => {
+    void load();
+    void loadRepeat();
+  });
 
   const whNames = useMemo(() => (data?.by_warehouse ?? []).map((w) => w.warehouse), [data]);
   const series = useMemo(() => {
@@ -176,10 +200,22 @@ export function DashboardPage() {
             <StatCard label="Aguardando baixa no ERP" value={fmtInt(c.sa_informada)} unit="MEs" icon={<Hourglass className="h-5 w-5" />} tone="blue" to={withFilters({ status: ['sa_informada'] })} />
             <StatCard label="Concluídas" value={fmtInt(c.concluida)} unit="MEs" icon={<CheckCheck className="h-5 w-5" />} tone="green" to={withFilters({ status: ['concluida'] })} />
             <StatCard label="Canceladas" value={fmtInt(c.cancelada)} unit="MEs" icon={<Ban className="h-5 w-5" />} tone="red" to={withFilters({ status: ['cancelada'] })} />
+            {showRepeat && (
+            <StatCard
+              label={`Retiradas repetidas (${repeatDays} dias)`}
+              value={repeat ? fmtInt(repeat.total) : '…'}
+              unit="ativo + material"
+              icon={<AlertTriangle className="h-5 w-5" />}
+              tone={repeat && repeat.total > 0 ? 'amber' : 'green'}
+              to="#retiradas-repetidas"
+            />
+            )}
             {c.aguardando_aprovacao > 0 && (
               <StatCard label="Aguardando aprovação" value={fmtInt(c.aguardando_aprovacao)} unit="MEs" icon={<ShieldQuestion className="h-5 w-5" />} tone="amber" to={withFilters({ status: ['aguardando_aprovacao'] })} />
             )}
           </div>
+
+          {showRepeat && <RepeatAssetCard data={repeat} loading={repeatLoading} days={repeatDays} onDaysChange={setRepeatDays} />}
 
           <Card>
             <CardHeader
