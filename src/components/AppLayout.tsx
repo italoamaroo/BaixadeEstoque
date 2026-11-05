@@ -1,3 +1,4 @@
+import { OfflineSync } from './OfflineSync';
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
@@ -13,6 +14,7 @@ import {
   Menu,
   PackageMinus,
   QrCode,
+  CloudOff,
   ScanLine,
   Settings,
   ShieldCheck,
@@ -38,6 +40,7 @@ const OPERATION: NavItem[] = [
   { to: '/nova-saida', label: 'Nova saída', icon: <PackageMinus className="h-5 w-5" />, perm: 'createMovement' },
   { to: '/balcao', label: 'Balcão (leitor + tablet)', icon: <ScanLine className="h-5 w-5" />, perm: 'useCounter' },
   { to: '/movimentacoes', label: 'Movimentações', icon: <ClipboardList className="h-5 w-5" />, perm: 'viewMovements' },
+  { to: '/saidas-offline', label: 'Saídas offline', icon: <CloudOff className="h-5 w-5" />, perm: 'createMovement' },
   { to: '/pendencias-sa', label: 'Pendências SA / ERP', icon: <Hourglass className="h-5 w-5" />, perm: 'viewPending' },
   { to: '/exportar', label: 'Exportar Excel/PDF', icon: <FileSpreadsheet className="h-5 w-5" />, perm: 'exportExcel' },
 ];
@@ -268,6 +271,7 @@ export function AppLayout() {
             {access && <UserMenu />}
           </div>
         </header>
+        <OfflineSync />
         <main className="mx-auto max-w-7xl px-4 pb-28 pt-5 sm:px-6 lg:pb-10 print:max-w-none print:p-0">
           <Outlet />
         </main>

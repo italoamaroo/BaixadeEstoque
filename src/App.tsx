@@ -28,6 +28,7 @@ const LookupsPage = lazy(() => import('@/pages/admin/LookupsPage').then((m) => (
 const UsersPage = lazy(() => import('@/pages/admin/UsersPage').then((m) => ({ default: m.UsersPage })));
 const RolesPage = lazy(() => import('@/pages/admin/RolesPage').then((m) => ({ default: m.RolesPage })));
 const AuditPage = lazy(() => import('@/pages/admin/AuditPage').then((m) => ({ default: m.AuditPage })));
+const OfflineQueuePage = lazy(() => import('@/pages/OfflineQueuePage').then((m) => ({ default: m.OfflineQueuePage })));
 const CounterPage = lazy(() => import('@/pages/counter/CounterPage').then((m) => ({ default: m.CounterPage })));
 const TerminalPage = lazy(() => import('@/pages/counter/TerminalPage').then((m) => ({ default: m.TerminalPage })));
 const SettingsPage = lazy(() => import('@/pages/admin/SettingsPage').then((m) => ({ default: m.SettingsPage })));
@@ -58,6 +59,7 @@ function AppRoutes() {
             <Route path="terminal" element={<RequirePermission perm="counterTerminal"><TerminalPage /></RequirePermission>} />
             <Route element={<AppLayout />}>
               <Route index element={<HomeRoute />} />
+              <Route path="saidas-offline" element={<RequirePermission perm="createMovement"><OfflineQueuePage /></RequirePermission>} />
               <Route path="balcao" element={<RequirePermission perm="useCounter"><CounterPage /></RequirePermission>} />
               <Route path="balcao/:id" element={<RequirePermission perm="useCounter"><CounterPage /></RequirePermission>} />
               <Route path="nova-saida" element={<RequirePermission perm="createMovement"><NewMovementPage /></RequirePermission>} />

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ArrowLeft, CheckCircle2, Pencil, RefreshCw } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, CloudOff, Pencil, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import { Alert, Card, KeyValue } from '@/components/ui/Card';
@@ -12,6 +12,7 @@ import { toPayloadItems, validateCart } from '@/lib/cart';
 import { errorMessage, isNetworkError } from '@/lib/errors';
 import { fmtDateTime } from '@/lib/format';
 import { buildSignaturePath, dataUrlToBlob } from '@/lib/signature';
+import { enqueueMovement } from '@/lib/offlineQueue';
 import { movementDetailsSchema, firstError } from '@/lib/validation';
 import type { CreatedInfo, StepProps } from './NewMovementPage';
 import { CartList } from './CartList';
@@ -19,12 +20,13 @@ import { CartList } from './CartList';
 type Phase = 'idle' | 'upload' | 'save';
 
 export function StepReview({ draft, update, goTo, back, rules, onCreated }: StepProps & { onCreated: (c: CreatedInfo) => void }) {
-  const { settings } = useAuth();
+  const { settings, userId } = useAuth();
   const { options } = useWarehouse();
   const online = useOnlineStatus();
   const { data } = useLookups(['contracts', 'sectors', 'service_fronts', 'application_locations']);
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [canSaveOffline, setCanSaveOffline] = useState(false);
   const lock = useRef(false);
 
   const warehouse = options.find((w) => w.id === draft.warehouse_id);
@@ -39,11 +41,68 @@ export function StepReview({ draft, update, goTo, back, rules, onCreated }: Step
     ...(draft.signature_data_url ? [] : ['Assinatura não coletada.']),
   ];
 
+  const buildPayload = (path: string | null) => ({
+    id: draft.id,
+    warehouse_id: draft.warehouse_id,
+    contract_id: d.contract_id,
+    sector_id: d.sector_id,
+    service_front_id: d.service_front_id || null,
+    service_order_text: d.service_order_text || null,
+    fixed_asset_text: d.fixed_asset_text || null,
+    application_location_id: d.application_location_id || null,
+    application_location_text: d.application_location_id ? null : d.application_location_text || null,
+    notes: d.notes || null,
+    requester_employee_id: draft.requester?.id,
+    received_by_employee_id: (draft.receiver ?? draft.requester)?.id,
+    items: toPayloadItems(draft.cart),
+    signature: { storage_path: path, signed_at: draft.signature_signed_at },
+    source: draft.source,
+  });
+
+  /** Sem internet: guarda a saída e a assinatura no aparelho; o envio é automático quando a conexão voltar. */
+  const saveOffline = async () => {
+    if (lock.current || problems.length || !warehouse || !userId) return;
+    lock.current = true;
+    try {
+      const { signature: _sig, ...payload } = buildPayload(null);
+      void _sig;
+      const when = draft.signature_signed_at ?? new Date().toISOString();
+      await enqueueMovement({
+        id: draft.id,
+        user_id: userId,
+        saved_at: new Date().toISOString(),
+        offline_at: when,
+        warehouse_code: warehouse.code,
+        warehouse_name: warehouse.name,
+        requester_name: draft.requester?.full_name ?? '',
+        item_count: draft.cart.length,
+        items_summary: draft.cart
+          .slice(0, 4)
+          .map((c) => `${c.material.code} (${c.quantity_delivered} ${c.material.unit})`)
+          .join(', ') + (draft.cart.length > 4 ? '…' : ''),
+        payload,
+        signature_data_url: draft.signature_data_url as string,
+        signature_signed_at: draft.signature_signed_at,
+      });
+      toast.success('Saída guardada no aparelho. Será enviada quando a internet voltar.');
+      onCreated({ id: draft.id, me_number: '', status: 'offline', warehouse_name: warehouse.name, offline: true });
+    } catch (err) {
+      setError(`Não foi possível guardar no aparelho: ${errorMessage(err)}`);
+    } finally {
+      lock.current = false;
+    }
+  };
+
   const submit = async () => {
     // Proteção contra duplo clique: trava síncrona + botão desabilitado
     if (lock.current || problems.length || !warehouse) return;
+    if (!online) {
+      await saveOffline();
+      return;
+    }
     lock.current = true;
     setError(null);
+    setCanSaveOffline(false);
     let path = draft.signature_path;
     try {
       // 1) Upload da assinatura (uma vez; reaproveita em novas tentativas)
@@ -57,23 +116,7 @@ export function StepReview({ draft, update, goTo, back, rules, onCreated }: Step
 
       // 2) Gravação transacional da ME (idempotente pelo id)
       setPhase('save');
-      const payload = {
-        id: draft.id,
-        warehouse_id: draft.warehouse_id,
-        contract_id: d.contract_id,
-        sector_id: d.sector_id,
-        service_front_id: d.service_front_id || null,
-        service_order_text: d.service_order_text || null,
-        fixed_asset_text: d.fixed_asset_text || null,
-        application_location_id: d.application_location_id || null,
-        application_location_text: d.application_location_id ? null : d.application_location_text || null,
-        notes: d.notes || null,
-        requester_employee_id: draft.requester?.id,
-        received_by_employee_id: (draft.receiver ?? draft.requester)?.id,
-        items: toPayloadItems(draft.cart),
-        signature: { storage_path: path, signed_at: draft.signature_signed_at },
-        source: draft.source,
-      };
+      const payload = buildPayload(path);
 
       let result;
       try {
@@ -96,9 +139,11 @@ export function StepReview({ draft, update, goTo, back, rules, onCreated }: Step
       onCreated({ id: result.id, me_number: result.me_number, status: result.status, warehouse_name: warehouse.name });
     } catch (err) {
       const msg = errorMessage(err);
+      const net = isNetworkError(err);
+      setCanSaveOffline(net);
       setError(
-        isNetworkError(err)
-          ? 'A conexão falhou antes da confirmação do servidor. A ME ainda NÃO foi confirmada. Seus dados e a assinatura foram mantidos — toque em "Tentar novamente". Não há risco de duplicidade.'
+        net
+          ? 'A conexão falhou antes da confirmação do servidor. A ME ainda NÃO foi confirmada. Seus dados e a assinatura foram mantidos: toque em "Tentar novamente" ou guarde no aparelho para enviar depois. Não há risco de duplicidade.'
           : msg,
       );
     } finally {
@@ -184,7 +229,11 @@ export function StepReview({ draft, update, goTo, back, rules, onCreated }: Step
         </Alert>
       )}
       {settings?.require_approval && <Alert tone="info">Após a confirmação, a ME ficará aguardando aprovação do gestor.</Alert>}
-      {!online && <Alert tone="error">Sem conexão. Aguarde a internet voltar para confirmar.</Alert>}
+      {!online && (
+        <Alert tone="warning" title="Sem internet">
+          A saída será guardada neste aparelho, com a assinatura, e enviada sozinha quando a internet voltar. O número oficial da ME é gerado no envio.
+        </Alert>
+      )}
       {error && <Alert tone="error" title="ME não confirmada">{error}</Alert>}
 
       <div className="sticky bottom-20 z-10 flex gap-3 lg:bottom-4">
@@ -196,13 +245,26 @@ export function StepReview({ draft, update, goTo, back, rules, onCreated }: Step
           variant="success"
           block
           loading={busy}
-          disabled={problems.length > 0 || !online}
-          icon={error ? <RefreshCw className="h-5 w-5" /> : <CheckCircle2 className="h-6 w-6" />}
+          disabled={problems.length > 0}
+          icon={!online ? <CloudOff className="h-6 w-6" /> : error ? <RefreshCw className="h-5 w-5" /> : <CheckCircle2 className="h-6 w-6" />}
           onClick={() => void submit()}
         >
-          {phase === 'upload' ? 'Enviando assinatura…' : phase === 'save' ? 'Gerando ME…' : error ? 'Tentar novamente' : 'Confirmar e gerar ME'}
+          {phase === 'upload'
+            ? 'Enviando assinatura…'
+            : phase === 'save'
+              ? 'Gerando ME…'
+              : !online
+                ? 'Guardar no aparelho'
+                : error
+                  ? 'Tentar novamente'
+                  : 'Confirmar e gerar ME'}
         </Button>
       </div>
+      {canSaveOffline && online && !busy && (
+        <Button variant="secondary" size="lg" block icon={<CloudOff className="h-5 w-5" />} onClick={() => void saveOffline()}>
+          Guardar no aparelho e enviar depois
+        </Button>
+      )}
     </div>
   );
 }

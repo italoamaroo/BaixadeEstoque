@@ -7,7 +7,7 @@ export function ConnectionBanner() {
   return (
     <div className="sticky top-0 z-40 flex items-center justify-center gap-2 bg-red-600 px-4 py-2 text-sm font-medium text-white" role="alert">
       <WifiOff className="h-4 w-4" />
-      Sem conexão. Os dados preenchidos ficam guardados; nada será confirmado até a internet voltar.
+      Sem internet. A Nova saída continua funcionando: a saída fica guardada no aparelho e é enviada quando a conexão voltar.
     </div>
   );
 }

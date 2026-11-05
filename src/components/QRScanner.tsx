@@ -157,9 +157,11 @@ export function QRScanner({ onScan, paused, autoStart = true }: Props) {
             Desligar câmera
           </Button>
         ) : null}
-        <Button variant="ghost" icon={<Keyboard className="h-4 w-4" />} onClick={() => setShowManual((v) => !v)}>
-          Digitar código
-        </Button>
+        {!showManual && (
+          <Button variant="ghost" icon={<Keyboard className="h-4 w-4" />} onClick={() => setShowManual(true)}>
+            Digitar código
+          </Button>
+        )}
       </div>
 
       {showManual && (

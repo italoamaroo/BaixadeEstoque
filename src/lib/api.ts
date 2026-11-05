@@ -1,6 +1,7 @@
 import { supabase, SIGNATURE_BUCKET } from './supabase';
 import { toAppError, AppError, isNetworkError } from './errors';
 import { toRpcFilters, type MovementFilters } from './filters';
+import { cachedLookup, offlineEmployees, offlineFindMaterial, offlineSearchMaterials, saveLookupCache } from './offlineCache';
 import type {
   Access,
   AdminUser,
@@ -90,9 +91,27 @@ export interface FindMaterialResult {
   code?: string;
   material?: Material;
 }
-export const findMaterialByCode = (code: string) => rpc<FindMaterialResult>('find_material_by_code', { p_code: code });
+/** Sem internet, usa a cópia dos cadastros guardada no aparelho (modo offline). */
+async function withOfflineFallback<T>(online: () => Promise<T>, offline: () => Promise<T>): Promise<T> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return offline();
+  try {
+    return await online();
+  } catch (err) {
+    if (isNetworkError(err)) return offline();
+    throw err;
+  }
+}
+
+export const findMaterialByCode = (code: string) =>
+  withOfflineFallback(
+    () => rpc<FindMaterialResult>('find_material_by_code', { p_code: code }),
+    () => offlineFindMaterial(code),
+  );
 export const searchMaterials = (term: string, onlyActive = true, limit = 30) =>
-  rpc<Material[]>('search_materials', { p_term: term, p_only_active: onlyActive, p_limit: limit });
+  withOfflineFallback(
+    () => rpc<Material[]>('search_materials', { p_term: term, p_only_active: onlyActive, p_limit: limit }),
+    () => offlineSearchMaterials(term, onlyActive, limit),
+  );
 
 export interface MovementDetail {
   movement: MovementRow;
@@ -203,9 +222,15 @@ export async function saveWarehouse(w: Partial<Warehouse> & { code: string; name
 }
 
 export async function listLookup(table: LookupTable, includeInactive = false): Promise<Lookup[]> {
-  let q = supabase.from(table).select('*').order('name');
-  if (!includeInactive) q = q.eq('active', true);
-  return (unwrap(await q) ?? []) as Lookup[];
+  const online = async () => {
+    let q = supabase.from(table).select('*').order('name');
+    if (!includeInactive) q = q.eq('active', true);
+    const rows = (unwrap(await q) ?? []) as Lookup[];
+    if (!includeInactive) void saveLookupCache(table, rows);
+    return rows;
+  };
+  if (includeInactive) return online();
+  return withOfflineFallback(online, async () => (await cachedLookup(table)) ?? []);
 }
 
 export async function saveLookup(table: LookupTable, row: Partial<Lookup> & { code: string; name: string; active: boolean }) {
@@ -216,6 +241,16 @@ export async function saveLookup(table: LookupTable, row: Partial<Lookup> & { co
 }
 
 export async function listEmployees(opts: { search?: string; includeInactive?: boolean; limit?: number } = {}): Promise<Employee[]> {
+  if (!opts.includeInactive) {
+    return withOfflineFallback(
+      () => listEmployeesOnline(opts),
+      () => offlineEmployees(opts.search, opts.limit ?? 500),
+    );
+  }
+  return listEmployeesOnline(opts);
+}
+
+async function listEmployeesOnline(opts: { search?: string; includeInactive?: boolean; limit?: number }): Promise<Employee[]> {
   let q = supabase.from('employees').select('*').order('full_name').limit(opts.limit ?? 500);
   if (!opts.includeInactive) q = q.eq('active', true);
   const s = opts.search?.trim();

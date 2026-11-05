@@ -1,4 +1,4 @@
-import { CheckCircle2, FileText, PackageMinus, Printer } from 'lucide-react';
+import { CheckCircle2, CloudOff, FileText, PackageMinus, Printer } from 'lucide-react';
 import { Button, LinkButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/Badge';
@@ -6,6 +6,32 @@ import type { MovementStatus } from '@/types/db';
 import type { CreatedInfo } from './NewMovementPage';
 
 export function StepSuccess({ created, onNew }: { created: CreatedInfo; onNew: () => void }) {
+  if (created.offline) {
+    return (
+      <div className="mx-auto max-w-lg">
+        <Card className="text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
+            <CloudOff className="h-9 w-9 text-amber-700" />
+          </div>
+          <p className="text-lg font-bold text-slate-900">Saída guardada no aparelho</p>
+          <p className="mt-1 font-mono text-sm text-slate-500">Identificador provisório {created.id.slice(0, 8).toUpperCase()}</p>
+          <p className="mt-3 text-slate-600">
+            Estoque {created.warehouse_name}. Ela será enviada sozinha quando a internet voltar e receberá o número oficial da ME nesse momento,
+            com a data e a hora reais da retirada.
+          </p>
+          <p className="mt-2 text-sm font-medium text-amber-800">Não limpe os dados do navegador nem troque de aparelho antes do envio.</p>
+          <div className="mt-6 grid gap-2">
+            <Button size="xl" icon={<PackageMinus className="h-6 w-6" />} onClick={onNew}>
+              Nova saída
+            </Button>
+            <LinkButton to="/saidas-offline" variant="secondary" size="lg" block icon={<CloudOff className="h-5 w-5" />}>
+              Ver saídas guardadas
+            </LinkButton>
+          </div>
+        </Card>
+      </div>
+    );
+  }
   return (
     <div className="mx-auto max-w-lg">
       <Card className="text-center">

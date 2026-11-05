@@ -2,8 +2,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { getAccess } from '@/lib/api';
+import { cachedAccess, saveAccessCache } from '@/lib/offlineCache';
 import { can, type Permission } from '@/lib/constants';
-import { errorMessage } from '@/lib/errors';
+import { errorMessage, isNetworkError } from '@/lib/errors';
 import type { Access, AppRole, Settings, Warehouse } from '@/types/db';
 
 interface AuthState {
@@ -47,8 +48,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const a = await getAccess();
       loadedFor.current = userId;
       setAccess(a);
+      void saveAccessCache(userId, a);
     } catch (err) {
-      setAccessError(errorMessage(err, 'Não foi possível carregar suas permissões.'));
+      // Sem internet: usa as permissões guardadas no aparelho (modo offline)
+      const cached = isNetworkError(err) ? await cachedAccess(userId) : undefined;
+      if (cached) {
+        loadedFor.current = userId;
+        setAccess(cached);
+      } else {
+        setAccessError(errorMessage(err, 'Não foi possível carregar suas permissões.'));
+      }
     } finally {
       setLoading(false);
     }

@@ -34,6 +34,8 @@ export interface CreatedInfo {
   me_number: string;
   status: string;
   warehouse_name: string;
+  /** guardada no aparelho (sem internet), aguardando envio */
+  offline?: boolean;
 }
 
 export function NewMovementPage() {

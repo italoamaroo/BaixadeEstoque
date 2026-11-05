@@ -1,10 +1,22 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
 
+/** Lista dos arquivos gerados no build, para o service worker guardar o app inteiro no aparelho (modo offline). */
+function assetList(): Plugin {
+  return {
+    name: 'asset-list',
+    apply: 'build',
+    generateBundle(_opts, bundle) {
+      const files = Object.keys(bundle).filter((f) => !f.endsWith('.map'));
+      this.emitFile({ type: 'asset', fileName: 'asset-list.json', source: JSON.stringify({ build: Date.now(), files }) });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), assetList()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
