@@ -584,7 +584,9 @@ export const counterRegisterAttempt = (movementId: string, method: 'assinatura' 
   rpc<string>('counter_register_attempt', { p_movement_id: movementId, p_method: method, p_result: result, p_detail: detail ?? null });
 export const counterConfirm = (
   movementId: string,
-  payload: { method: 'assinatura'; signature_path: string } | { method: 'facial'; verification_id: string },
+  payload:
+    | { method: 'assinatura'; signature_path: string; photo_path?: string | null; photo_skipped_reason?: string | null }
+    | { method: 'facial'; verification_id: string },
 ) => rpc<{ id: string; me_number: string; status: MovementStatus }>('counter_confirm', { p_movement_id: movementId, p_payload: payload });
 export const counterMyOpen = () =>
   rpc<
@@ -647,3 +649,28 @@ export const getRepeatAssetWithdrawals = (filters: Partial<MovementFilters>, day
     p_filters: toRpcFilters(filters),
     p_days: days,
   });
+
+// ---------------------------------------------------------------------------
+// Foto do solicitante (confirmação no balcão) — visível só para gestor/admin
+// ---------------------------------------------------------------------------
+export const PHOTO_BUCKET = 'fotos-retirada';
+export async function uploadPhoto(path: string, blob: Blob): Promise<void> {
+  const { error } = await supabase.storage.from(PHOTO_BUCKET).upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: false });
+  if (error && !/exists|duplicate/i.test(error.message)) throw toAppError(error);
+}
+export interface MovementPhoto {
+  id: string;
+  movement_id: string;
+  storage_path: string;
+  kind: string;
+  taken_at: string;
+}
+export async function getMovementPhotos(movementId: string): Promise<MovementPhoto[]> {
+  const r = await supabase.from('movement_photos').select('id, movement_id, storage_path, kind, taken_at').eq('movement_id', movementId).order('taken_at');
+  return (unwrap(r) ?? []) as MovementPhoto[];
+}
+export async function getPhotoUrl(path: string, expiresIn = 300): Promise<string> {
+  const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrl(path, expiresIn);
+  if (error || !data) throw toAppError(error ?? new Error('Foto indisponível.'));
+  return data.signedUrl;
+}

@@ -23,6 +23,7 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   viewDashboard: 'Painel e consultas dos estoques autorizados',
   viewMovements: 'Lista e detalhes das MEs dos estoques autorizados',
   viewRepeatAlerts: 'Alerta de retiradas repetidas por ativo fixo (Painel)',
+  viewRequesterPhoto: 'Ver a foto do solicitante tirada no balcão',
   useCounter: 'Balcão: separar com leitor sem fio e acompanhar no tablet',
   counterTerminal: 'Tablet do solicitante (somente a ME pareada)',
   viewAudit: 'Consultar auditoria',

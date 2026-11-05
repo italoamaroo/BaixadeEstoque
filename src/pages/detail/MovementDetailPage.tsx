@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import {
   ArrowLeft,
   Ban,
+  Camera,
   CheckCheck,
   Copy,
   FileSignature,
@@ -28,6 +29,9 @@ import {
   getMovementAudit,
   getMovementDetail,
   getSignatureUrl,
+  getMovementPhotos,
+  getPhotoUrl,
+  type MovementPhoto,
   listProfiles,
   logEvent,
   type MovementDetail,
@@ -41,6 +45,50 @@ import { MovementPrint } from './MovementPrint';
 import { MovementTimeline } from './MovementTimeline';
 import { CorrectionModal } from './CorrectionModal';
 import { ReplaceSignatureModal } from './ReplaceSignatureModal';
+
+/** Foto do solicitante tirada no balcão (somente gestor/admin). */
+function RequesterPhotoCard({ movementId }: { movementId: string }) {
+  const [photos, setPhotos] = useState<MovementPhoto[] | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    getMovementPhotos(movementId)
+      .then(setPhotos)
+      .catch(() => setPhotos([]));
+  }, [movementId]);
+  if (!photos || photos.length === 0) return null;
+  const last = photos[photos.length - 1];
+  const load = async () => {
+    setLoading(true);
+    try {
+      setUrl(await getPhotoUrl(last.storage_path));
+      void logEvent('me.foto_consultada', movementId, { foto: last.id });
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <Card>
+      <CardHeader title="Foto do solicitante" subtitle={`Tirada no balcão em ${fmtDateTime(last.taken_at)} · visível só para a gestão`} />
+      <div className="flex min-h-[160px] items-center justify-center rounded-lg border border-slate-200 bg-white p-2">
+        {url ? (
+          <img src={url} alt="Foto do solicitante" className="max-h-72 rounded" />
+        ) : loading ? (
+          <Spinner className="h-6 w-6 text-brand-600" />
+        ) : error ? (
+          <p className="text-sm text-red-600">{error}</p>
+        ) : (
+          <Button variant="secondary" icon={<Camera className="h-4 w-4" />} onClick={() => void load()}>
+            Ver foto
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
 
 function SignatureCard({ sig, autoload, onUrl }: { sig: SignatureRecord; autoload: boolean; onUrl?: (u: string) => void }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -365,6 +413,7 @@ export function MovementDetailPage() {
               </div>
             )}
           </Card>
+          {can('viewRequesterPhoto') && <RequesterPhotoCard movementId={m.id} />}
         </div>
 
         <div className="mt-6">

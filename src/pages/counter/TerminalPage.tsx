@@ -5,7 +5,8 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCounterSession } from '@/hooks/useCounterSession';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
-import { counterConfirm, counterPair, counterRegisterAttempt, uploadSignature, type CounterSnapshot } from '@/lib/api';
+import { counterConfirm, counterPair, counterRegisterAttempt, uploadPhoto, uploadSignature, type CounterSnapshot } from '@/lib/api';
+import { PhotoCapture } from '@/components/PhotoCapture';
 import { activeConfirmationMethod, counterSignaturePath } from '@/lib/confirmation';
 import { errorMessage } from '@/lib/errors';
 import { fmtDateTime, fmtQty, fmtTime } from '@/lib/format';
@@ -291,11 +292,17 @@ function Session({ snapshot, onChanged, onDismiss }: { snapshot: CounterSnapshot
   );
 }
 
-/** Etapa de validação do solicitante. Hoje: assinatura. O facial entra aqui sem mudar o resto. */
+/**
+ * Etapa de validação do solicitante: 1) foto pela câmera frontal; 2) assinatura.
+ * O facial (quando definido o fornecedor) entra aqui sem mudar o resto.
+ */
 function ConfirmStep({ open, snapshot, onClose, onDone }: { open: boolean; snapshot: CounterSnapshot; onClose: () => void; onDone: () => void }) {
   const { settings } = useAuth();
   const method = activeConfirmationMethod();
   const exporter = useRef<() => string | null>(() => null);
+  const [phase, setPhase] = useState<'foto' | 'assinatura'>('foto');
+  const [photo, setPhoto] = useState<Blob | null>(null);
+  const [noCamera, setNoCamera] = useState<string | null>(null);
   const [empty, setEmpty] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -305,12 +312,15 @@ function ConfirmStep({ open, snapshot, onClose, onDone }: { open: boolean; snaps
     if (open) {
       setErr(null);
       setEmpty(true);
+      setPhase('foto');
+      setPhoto(null);
+      setNoCamera(null);
     }
   }, [open]);
 
   const cancel = () => {
     if (busy) return;
-    void counterRegisterAttempt(m.id, method.id, 'cancelada').catch(() => undefined);
+    void counterRegisterAttempt(m.id, method.id, 'cancelada', { etapa: phase }).catch(() => undefined);
     onClose();
   };
 
@@ -324,9 +334,20 @@ function ConfirmStep({ open, snapshot, onClose, onDone }: { open: boolean; snaps
     setBusy(true);
     setErr(null);
     try {
-      const path = counterSignaturePath(m.warehouse_code, m.id, m.movement_at, settings?.timezone ?? 'America/Recife');
+      const tz = settings?.timezone ?? 'America/Recife';
+      let photoPath: string | null = null;
+      if (photo) {
+        photoPath = counterSignaturePath(m.warehouse_code, m.id, m.movement_at, tz).replace('assinatura_balcao_', 'foto_solicitante_').replace(/\.png$/, '.jpg');
+        await uploadPhoto(photoPath, photo);
+      }
+      const path = counterSignaturePath(m.warehouse_code, m.id, m.movement_at, tz);
       await uploadSignature(path, dataUrlToBlob(dataUrl));
-      await counterConfirm(m.id, { method: 'assinatura', signature_path: path });
+      await counterConfirm(m.id, {
+        method: 'assinatura',
+        signature_path: path,
+        photo_path: photoPath,
+        photo_skipped_reason: photoPath ? null : noCamera ?? 'Câmera indisponível',
+      });
       playFeedback('ok');
       toast.success('ME confirmada.');
       onClose();
@@ -346,28 +367,61 @@ function ConfirmStep({ open, snapshot, onClose, onDone }: { open: boolean; snaps
       onClose={cancel}
       busy={busy}
       size="lg"
-      title={method.id === 'assinatura' ? 'Assine para confirmar a retirada' : 'Validação facial'}
+      title={phase === 'foto' ? '1 de 2 · Foto do solicitante' : '2 de 2 · Assine para confirmar a retirada'}
       description={`${m.me_number} · ${m.requester_name} (${m.requester_registration}) · ${fmtDateTime(new Date())}`}
       footer={
-        <>
-          <Button variant="secondary" icon={<XCircle className="h-4 w-4" />} onClick={cancel} disabled={busy}>
-            Cancelar
-          </Button>
-          <Button variant="success" icon={<PenLine className="h-4 w-4" />} onClick={() => void confirm()} loading={busy} disabled={empty}>
-            Confirmar ME
-          </Button>
-        </>
+        phase === 'foto' ? (
+          <>
+            <Button variant="secondary" icon={<XCircle className="h-4 w-4" />} onClick={cancel}>
+              Cancelar
+            </Button>
+            {noCamera && !photo ? (
+              <Button variant="secondary" onClick={() => setPhase('assinatura')}>
+                Continuar sem foto
+              </Button>
+            ) : (
+              <Button icon={<PenLine className="h-4 w-4" />} disabled={!photo} onClick={() => setPhase('assinatura')}>
+                Usar esta foto
+              </Button>
+            )}
+          </>
+        ) : (
+          <>
+            <Button variant="secondary" onClick={() => setPhase('foto')} disabled={busy}>
+              Voltar à foto
+            </Button>
+            <Button variant="success" icon={<ShieldCheck className="h-4 w-4" />} onClick={() => void confirm()} loading={busy} disabled={empty}>
+              Confirmar ME
+            </Button>
+          </>
+        )
       }
     >
-      <SignaturePad
-        onChange={(isEmpty) => {
-          setEmpty(isEmpty);
-          setErr(null);
-        }}
-        registerExporter={(fn) => {
-          exporter.current = fn;
-        }}
-      />
+      {phase === 'foto' ? (
+        <div>
+          <p className="mb-3 text-sm text-slate-600">
+            Posicione o rosto no centro e toque em <strong>Tirar foto</strong>. A foto fica registrada na ME como comprovante da retirada e só a
+            gestão tem acesso.
+          </p>
+          <PhotoCapture onCapture={(b) => setPhoto(b)} onCameraUnavailable={(r) => setNoCamera(r)} />
+          {noCamera && !photo && (
+            <p className="mt-3 text-center text-sm text-amber-700">Sem câmera, a confirmação segue só com a assinatura e o motivo fica registrado.</p>
+          )}
+        </div>
+      ) : (
+        <>
+          <SignaturePad
+            onChange={(isEmpty) => {
+              setEmpty(isEmpty);
+              setErr(null);
+            }}
+            registerExporter={(fn) => {
+              exporter.current = fn;
+            }}
+          />
+          {!photo && <p className="mt-2 text-sm text-amber-700">Sem foto: {noCamera ?? 'câmera indisponível'}.</p>}
+        </>
+      )}
       {err && (
         <div className="mt-3">
           <Alert tone="error">{err}</Alert>
