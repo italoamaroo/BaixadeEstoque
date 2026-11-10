@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRef, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, ClipboardList, Eye, FileSpreadsheet, Hourglass, PackageMinus, Printer } from 'lucide-react';
 import clsx from 'clsx';
@@ -15,6 +15,7 @@ import { errorMessage } from '@/lib/errors';
 import { filtersFromSearchParams, filtersToSearchParams, type MovementFilters } from '@/lib/filters';
 import { fmtDate, fmtDateTime, fmtTime } from '@/lib/format';
 import { useRealtimeMovements } from '@/hooks/useRealtimeMovements';
+import { useHeaderWarehouseFilter } from '@/hooks/useHeaderWarehouseFilter';
 import type { MovementRow } from '@/types/db';
 
 const SORTABLE: Record<string, string> = {
@@ -32,6 +33,7 @@ const SORTABLE: Record<string, string> = {
 export function MovementsPage() {
   const { can } = useAuth();
   const navigate = useNavigate();
+  useHeaderWarehouseFilter();
   const [params, setParams] = useSearchParams();
   const filters = useMemo(() => filtersFromSearchParams(params), [params]);
   const page = Number(params.get('pagina') ?? 1) || 1;
@@ -44,15 +46,20 @@ export function MovementsPage() {
   const [error, setError] = useState<string | null>(null);
   const [saTarget, setSaTarget] = useState<MovementRow | null>(null);
 
+  // só a resposta da busca mais recente vale (troca rápida de estoque/filtros)
+  const seq = useRef(0);
   const load = useCallback(async () => {
+    const my = ++seq.current;
     setLoading(true);
     try {
-      setData(await searchMovements(filters, page, pageSize, sort, dir));
+      const r = await searchMovements(filters, page, pageSize, sort, dir);
+      if (my !== seq.current) return;
+      setData(r);
       setError(null);
     } catch (err) {
-      setError(errorMessage(err));
+      if (my === seq.current) setError(errorMessage(err));
     } finally {
-      setLoading(false);
+      if (my === seq.current) setLoading(false);
     }
   }, [filters, page, pageSize, sort, dir]);
 

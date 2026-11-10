@@ -12,10 +12,12 @@ import { buildWorkbook, downloadBlob, type ExportKind } from '@/lib/excel';
 import { buildMovementsPdf, fetchPdfData, PDF_LIMIT } from '@/lib/pdfReport';
 import { errorMessage } from '@/lib/errors';
 import { describeFilters, exportFileName, filtersFromSearchParams, filtersToSearchParams, toRpcFilters } from '@/lib/filters';
+import { useHeaderWarehouseFilter } from '@/hooks/useHeaderWarehouseFilter';
 import { fmtInt } from '@/lib/format';
 
 export function ExportPage() {
   const { warehouses, displayName, settings } = useAuth();
+  useHeaderWarehouseFilter();
   const [params, setParams] = useSearchParams();
   const filters = useMemo(() => filtersFromSearchParams(params), [params]);
   const [kind, setKind] = useState<ExportKind>('resumo');

@@ -15,6 +15,7 @@ import { errorMessage } from '@/lib/errors';
 import { daysSince, fmtDateTime } from '@/lib/format';
 import { EMPTY_FILTERS } from '@/lib/filters';
 import { useRealtimeMovements } from '@/hooks/useRealtimeMovements';
+import { useWarehouse } from '@/contexts/WarehouseContext';
 import type { MovementRow } from '@/types/db';
 
 type Tab = 'aguardando_sa' | 'sa_informada';
@@ -29,7 +30,12 @@ export function SaPendingPage() {
   const { warehouses, can } = useAuth();
   // almoxarife (sem perfil de SA) abre direto nas baixas pendentes no ERP
   const [tab, setTab] = useState<Tab>(() => (can('informSa') ? 'aguardando_sa' : 'sa_informada'));
-  const [warehouseId, setWarehouseId] = useState('');
+  const { current } = useWarehouse();
+  const [warehouseId, setWarehouseId] = useState(current?.id ?? '');
+  // o estoque escolhido no topo vale para esta tela
+  useEffect(() => {
+    setWarehouseId(current?.id ?? '');
+  }, [current?.id]);
   const [q, setQ] = useState('');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
