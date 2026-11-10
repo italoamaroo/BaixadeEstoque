@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import {
   ArrowLeft,
   Ban,
+  Camera,
   CheckCheck,
   Copy,
   FileSignature,
@@ -28,6 +29,9 @@ import {
   getMovementAudit,
   getMovementDetail,
   getSignatureUrl,
+  getMovementPhotos,
+  getPhotoUrl,
+  type MovementPhoto,
   listProfiles,
   logEvent,
   type MovementDetail,
@@ -41,6 +45,50 @@ import { MovementPrint } from './MovementPrint';
 import { MovementTimeline } from './MovementTimeline';
 import { CorrectionModal } from './CorrectionModal';
 import { ReplaceSignatureModal } from './ReplaceSignatureModal';
+
+/** Foto do solicitante tirada no balcão (somente gestor/admin). */
+function RequesterPhotoCard({ movementId }: { movementId: string }) {
+  const [photos, setPhotos] = useState<MovementPhoto[] | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    getMovementPhotos(movementId)
+      .then(setPhotos)
+      .catch(() => setPhotos([]));
+  }, [movementId]);
+  if (!photos || photos.length === 0) return null;
+  const last = photos[photos.length - 1];
+  const load = async () => {
+    setLoading(true);
+    try {
+      setUrl(await getPhotoUrl(last.storage_path));
+      void logEvent('me.foto_consultada', movementId, { foto: last.id });
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <Card>
+      <CardHeader title="Foto do solicitante" subtitle={`Tirada no balcão em ${fmtDateTime(last.taken_at)} · visível só para a gestão`} />
+      <div className="flex min-h-[160px] items-center justify-center rounded-lg border border-slate-200 bg-white p-2">
+        {url ? (
+          <img src={url} alt="Foto do solicitante" className="max-h-72 rounded" />
+        ) : loading ? (
+          <Spinner className="h-6 w-6 text-brand-600" />
+        ) : error ? (
+          <p className="text-sm text-red-600">{error}</p>
+        ) : (
+          <Button variant="secondary" icon={<Camera className="h-4 w-4" />} onClick={() => void load()}>
+            Ver foto
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
 
 function SignatureCard({ sig, autoload, onUrl }: { sig: SignatureRecord; autoload: boolean; onUrl?: (u: string) => void }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -167,7 +215,13 @@ export function MovementDetailPage() {
 
   const m = detail.movement;
   const isCancelled = m.status === 'cancelada';
-  const beforeSa = m.status === 'aguardando_sa' || m.status === 'aguardando_aprovacao';
+  // antes do lançamento no ERP: aguardando SA/aprovação ou, em ME sem ativo fixo, aguardando a baixa (sem SA)
+  const beforeSa =
+    m.status === 'rascunho' ||
+    m.status === 'aguardando_assinatura' ||
+    m.status === 'aguardando_sa' ||
+    m.status === 'aguardando_aprovacao' ||
+    (m.status === 'sa_informada' && !m.sa_number);
   // Almoxarife cancela (devolução) só antes do lançamento no ERP; gestor/admin em qualquer status.
   const canCancel = !isCancelled && (can('cancelMovement') || (can('cancelBeforeSa') && beforeSa));
 
@@ -245,7 +299,7 @@ export function MovementDetailPage() {
           title={<span className="font-mono">{m.me_number}</span>}
           subtitle={
             <span className="flex flex-wrap items-center gap-2">
-              <StatusBadge status={m.status} /> Saída · {m.warehouse_name} · {fmtDateTime(m.movement_at)}
+              <StatusBadge status={m.status} emergency={m.is_emergency} /> Saída · {m.warehouse_name} · {fmtDateTime(m.movement_at)}
               {m.is_demo && <Badge className="bg-purple-50 text-purple-700 ring-purple-200">Dado fictício</Badge>}
             </span>
           }
@@ -256,7 +310,7 @@ export function MovementDetailPage() {
                   Aprovar
                 </Button>
               )}
-              {can('informSa') && (m.status === 'aguardando_sa' || m.status === 'sa_informada' || (m.status === 'concluida' && can('correctSaAfterCompletion'))) && (
+              {can('informSa') && (m.status === 'aguardando_sa' || (m.sa_number && (m.status === 'sa_informada' || (m.status === 'concluida' && can('correctSaAfterCompletion'))))) && (
                 <Button variant={m.status === 'aguardando_sa' ? 'warning' : 'secondary'} icon={<Hourglass className="h-4 w-4" />} onClick={() => setModal('sa')}>
                   {m.status === 'aguardando_sa' ? 'Informar SA' : 'Corrigir SA'}
                 </Button>
@@ -296,6 +350,12 @@ export function MovementDetailPage() {
           </div>
         )}
 
+        {m.is_emergency && (
+          <Alert tone="warning" title="ME emergencial · somente controle">
+            Não passa pela equipe de SA nem pela baixa no ERP. Motivo: {m.emergency_reason}
+          </Alert>
+        )}
+
         <div className="grid gap-4 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader title="Dados da movimentação" />
@@ -315,12 +375,20 @@ export function MovementDetailPage() {
 
           <Card>
             <CardHeader title="SA (ERP)" />
-            <dl className="space-y-3">
-              <KeyValue label="Número da SA" value={m.sa_number ? <span className="font-mono text-base font-semibold">{m.sa_number}</span> : <span className="text-orange-700">Pendente</span>} />
-              <KeyValue label="Informada por" value={m.sa_informed_by_name} />
-              <KeyValue label="Informada em" value={m.sa_informed_at ? fmtDateTime(m.sa_informed_at) : null} />
-              <KeyValue label="Baixa no ERP confirmada em" value={m.completed_at ? `${fmtDateTime(m.completed_at)} · ${m.completed_by_name ?? ''}` : null} />
-            </dl>
+            {m.is_emergency ? (
+              <dl className="space-y-3">
+                <KeyValue label="Número da SA" value="Não se aplica (ME emergencial)" />
+                <KeyValue label="Baixa no ERP" value="Não se aplica (ME emergencial)" />
+                <KeyValue label="Concluída em" value={m.completed_at ? `${fmtDateTime(m.completed_at)} · ${m.completed_by_name ?? ''}` : 'Aguardando confirmação do solicitante'} />
+              </dl>
+            ) : (
+              <dl className="space-y-3">
+                <KeyValue label="Número da SA" value={m.sa_number ? <span className="font-mono text-base font-semibold">{m.sa_number}</span> : <span className="text-orange-700">Pendente</span>} />
+                <KeyValue label="Informada por" value={m.sa_informed_by_name} />
+                <KeyValue label="Informada em" value={m.sa_informed_at ? fmtDateTime(m.sa_informed_at) : null} />
+                <KeyValue label="Baixa no ERP confirmada em" value={m.completed_at ? `${fmtDateTime(m.completed_at)} · ${m.completed_by_name ?? ''}` : null} />
+              </dl>
+            )}
           </Card>
 
           <Card className="lg:col-span-2">
@@ -359,6 +427,7 @@ export function MovementDetailPage() {
               </div>
             )}
           </Card>
+          {can('viewRequesterPhoto') && <RequesterPhotoCard movementId={m.id} />}
         </div>
 
         <div className="mt-6">
