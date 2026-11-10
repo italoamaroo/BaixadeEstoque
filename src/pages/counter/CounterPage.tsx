@@ -285,7 +285,7 @@ function ActiveCounter({ movementId, onNew }: { movementId: string; onNew: () =>
         title={
           <span className="flex flex-wrap items-center gap-3">
             <span className="font-mono">{m.me_number}</span>
-            <StatusBadge status={m.status} />
+            <StatusBadge status={m.status} emergency={m.is_emergency} />
           </span>
         }
         subtitle={`${m.warehouse_name} · Solicitante: ${m.requester_name} (${m.requester_registration})${m.fixed_asset ? ` · Ativo ${m.fixed_asset}` : ' · Sem ativo fixo'}`}
@@ -375,7 +375,10 @@ function ActiveCounter({ movementId, onNew }: { movementId: string; onNew: () =>
       )}
       {m.confirmed_at && (
         <Alert tone="success" title={`ME confirmada pelo solicitante em ${fmtDateTime(m.confirmed_at)}`}>
-          A ME seguiu para {m.fixed_asset ? 'a equipe de SA' : 'a baixa no ERP'}. Os itens não podem mais ser alterados.
+          {m.is_emergency
+            ? 'ME emergencial concluída, só para controle (sem SA e sem baixa no ERP).'
+            : `A ME seguiu para ${m.fixed_asset ? 'a equipe de SA' : 'a baixa no ERP'}.`}{' '}
+          Os itens não podem mais ser alterados.
         </Alert>
       )}
       {m.status === 'cancelada' && <Alert tone="error" title="Separação cancelada">{m.cancel_reason}</Alert>}

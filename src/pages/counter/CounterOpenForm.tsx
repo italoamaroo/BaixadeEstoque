@@ -4,7 +4,9 @@ import { useLookups } from '@/hooks/useLookups';
 import { useWarehouse } from '@/contexts/WarehouseContext';
 import { EmployeePicker } from '@/components/EmployeePicker';
 import { Button } from '@/components/ui/Button';
-import { Input, Select, Textarea } from '@/components/ui/Field';
+import { FixedField, Input, Select, Textarea } from '@/components/ui/Field';
+import { EmergencyFields } from '@/components/EmergencyFields';
+import { useFixedContract } from '@/hooks/useFixedContract';
 import { Alert, Card } from '@/components/ui/Card';
 import { PageLoader } from '@/components/ui/Spinner';
 import { counterListTerminals, counterOpen, suggestTerminal, type CounterTerminal } from '@/lib/api';
@@ -15,7 +17,7 @@ import type { Employee } from '@/types/db';
 /** Abertura da separação no balcão: estoque, solicitante e dados da ME. */
 export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) => void }) {
   const { current, options, setCurrentId } = useWarehouse();
-  const { data, loading, error } = useLookups(['contracts', 'sectors', 'service_fronts', 'fixed_assets', 'application_locations']);
+  const { data, loading, error } = useLookups(['contracts', 'sectors', 'service_fronts', 'fixed_assets']);
   const [requester, setRequester] = useState<Employee | null>(null);
   const [f, setF] = useState({
     contract_id: '',
@@ -23,9 +25,11 @@ export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) =
     service_front_id: '',
     service_order_text: '',
     fixed_asset_text: '',
-    application_location_id: '',
     notes: '',
+    emergency_reason: '',
   });
+  const [emergency, setEmergency] = useState(false);
+  const fixedContract = useFixedContract(data.contracts);
   const [terminals, setTerminals] = useState<CounterTerminal[] | null>(null);
   const [terminalId, setTerminalId] = useState('');
 
@@ -59,7 +63,9 @@ export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) =
     const errs: Record<string, string> = {};
     if (!current) errs.warehouse = 'Selecione o estoque.';
     if (!requester) errs.requester = 'Identifique o solicitante.';
-    if (!f.contract_id) errs.contract_id = 'Selecione o contrato.';
+    const contractId = fixedContract?.id ?? f.contract_id;
+    if (!contractId) errs.contract_id = 'Selecione o contrato.';
+    if (emergency && f.emergency_reason.trim().length < 5) errs.emergency_reason = 'Informe o motivo da emergência (mínimo de 5 caracteres).';
     if (!f.sector_id) errs.sector_id = 'Selecione o setor.';
     setErrors(errs);
     if (Object.keys(errs).length || !current || !requester || busy) return;
@@ -69,13 +75,16 @@ export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) =
       const r = await counterOpen({
         id: movementId,
         warehouse_id: current.id,
-        contract_id: f.contract_id,
+        contract_id: contractId,
         sector_id: f.sector_id,
         service_front_id: f.service_front_id || null,
         service_order_text: f.service_order_text || null,
         fixed_asset_text: f.fixed_asset_text || null,
-        application_location_id: f.application_location_id || null,
+        application_location_id: null,
+        application_location_text: '-',
         notes: f.notes || null,
+        emergency,
+        emergency_reason: emergency ? f.emergency_reason.trim() : null,
         requester_employee_id: requester.id,
         terminal_user_id: terminalId || null,
       });
@@ -117,14 +126,18 @@ export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) =
           <EmployeePicker label="Solicitante (quem vai retirar)" value={requester} onChange={setRequester} />
           {errors.requester && <p className="mt-1 text-sm text-red-600">{errors.requester}</p>}
         </div>
-        <Select label="Contrato" required value={f.contract_id} onChange={(e) => set('contract_id', e.target.value)} error={errors.contract_id} inputSize="lg">
-          <option value="">Selecione…</option>
-          {(data.contracts ?? []).map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.code} – {c.name}
-            </option>
-          ))}
-        </Select>
+        {fixedContract ? (
+          <FixedField label="Contrato" value={`${fixedContract.code} – ${fixedContract.name}`} hint="Contrato fixo (definido em Parâmetros)." />
+        ) : (
+          <Select label="Contrato" required value={f.contract_id} onChange={(e) => set('contract_id', e.target.value)} error={errors.contract_id} inputSize="lg">
+            <option value="">Selecione…</option>
+            {(data.contracts ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.code} – {c.name}
+              </option>
+            ))}
+          </Select>
+        )}
         <Select label="Setor" required value={f.sector_id} onChange={(e) => set('sector_id', e.target.value)} error={errors.sector_id} inputSize="lg">
           <option value="">Selecione…</option>
           {(data.sectors ?? []).map((c) => (
@@ -156,9 +169,11 @@ export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) =
           maxLength={40}
           inputSize="lg"
           hint={
-            f.fixed_asset_text.trim()
-              ? 'Com ativo fixo: depois da confirmação, a ME vai para a equipe de SA.'
-              : 'Sem ativo fixo: depois da confirmação, vai direto para a baixa no ERP.'
+            emergency
+              ? 'ME emergencial: depois da confirmação fica concluída, só para controle.'
+              : f.fixed_asset_text.trim()
+                ? 'Com ativo fixo: depois da confirmação, a ME vai para a equipe de SA.'
+                : 'Sem ativo fixo: depois da confirmação, vai direto para a baixa no ERP.'
           }
         />
         <datalist id="balcao-af-list">
@@ -168,15 +183,19 @@ export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) =
             </option>
           ))}
         </datalist>
-        <Select label="Local de aplicação" value={f.application_location_id} onChange={(e) => set('application_location_id', e.target.value)} inputSize="lg">
-          <option value="">Não informado</option>
-          {(data.application_locations ?? []).map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.name}
-            </option>
-          ))}
-        </Select>
+        <FixedField label="Local de aplicação" value="-" hint="Campo fixo." />
         <Textarea label="Observações" value={f.notes} onChange={(e) => set('notes', e.target.value)} maxLength={2000} rows={2} wrapClassName="sm:col-span-2" />
+        <EmergencyFields
+          emergency={emergency}
+          reason={f.emergency_reason}
+          onEmergency={(v) => {
+            setEmergency(v);
+            setErrors((e) => ({ ...e, emergency_reason: '' }));
+          }}
+          onReason={(v) => set('emergency_reason', v)}
+          error={errors.emergency_reason}
+          className="sm:col-span-2"
+        />
         <Select
           label="Tablet do solicitante"
           value={terminalId}
