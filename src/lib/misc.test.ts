@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseQty, slugify } from './format';
 import { saNumberError, materialSchema, firstError } from './validation';
-import { parseCsv, matrixToRows } from './import';
+import { parseCsv, matrixToRows, labelMatrixToRows } from './import';
 import { mapExportRows } from './excel';
 import { toAppError } from './errors';
 import { buildSignaturePath } from './signature';
@@ -106,5 +106,21 @@ describe('planilha de etiquetas', () => {
       ['AA001466D', 1],
     ]);
     expect(rows[0].material).toMatchObject({ code: 'BC002A83', name: 'ADESIVO LOCTITE 496 50G', unit: 'UN' });
+  });
+});
+
+describe('etiquetas: localização da planilha', () => {
+  it('usa a localização da planilha e separa o mesmo código em locais diferentes', () => {
+    const rows = labelMatrixToRows([
+      ['codigo', 'copias', 'localizacao'],
+      ['kn0821', '2', 'B-18'],
+      ['KN0821', '1', 'b-18'],
+      ['KN0821', '1', 'C-02'],
+      ['AA1', '1', ''],
+    ]);
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toMatchObject({ code: 'KN0821', copies: 3, location: 'B-18' });
+    expect(rows[1]).toMatchObject({ code: 'KN0821', copies: 1, location: 'C-02' });
+    expect(rows[2].location).toBeUndefined();
   });
 });

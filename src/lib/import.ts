@@ -159,6 +159,8 @@ const COPY_ALIASES = ['copias', 'cópias', 'qtd', 'qtde', 'quantidade', 'quant',
 export interface LabelSheetRow {
   code: string;
   copies: number;
+  /** localização informada na planilha (vale para a etiqueta, no lugar da do cadastro) */
+  location?: string;
   /** demais colunas reconhecidas (nome, unidade...) para cadastrar itens que não existirem */
   material: Record<string, unknown>;
 }
@@ -200,9 +202,12 @@ export function labelMatrixToRows(matrix: unknown[][]): LabelSheetRow[] {
     }
     const code = String(material.code ?? '').trim().toUpperCase();
     if (!code) continue;
-    const prev = byCode.get(code);
+    // mesmo código em localizações diferentes = etiquetas separadas
+    const location = String(material.location ?? '').trim();
+    const key = `${code}|${location.toUpperCase()}`;
+    const prev = byCode.get(key);
     if (prev) prev.copies = Math.min(prev.copies + copies, 100);
-    else byCode.set(code, { code, copies, material: { ...material, code } });
+    else byCode.set(key, { code, copies, location: location || undefined, material: { ...material, code } });
   }
   return [...byCode.values()];
 }
