@@ -299,7 +299,7 @@ export function MovementDetailPage() {
           title={<span className="font-mono">{m.me_number}</span>}
           subtitle={
             <span className="flex flex-wrap items-center gap-2">
-              <StatusBadge status={m.status} /> Saída · {m.warehouse_name} · {fmtDateTime(m.movement_at)}
+              <StatusBadge status={m.status} emergency={m.is_emergency} /> Saída · {m.warehouse_name} · {fmtDateTime(m.movement_at)}
               {m.is_demo && <Badge className="bg-purple-50 text-purple-700 ring-purple-200">Dado fictício</Badge>}
             </span>
           }
@@ -350,6 +350,12 @@ export function MovementDetailPage() {
           </div>
         )}
 
+        {m.is_emergency && (
+          <Alert tone="warning" title="ME emergencial · somente controle">
+            Não passa pela equipe de SA nem pela baixa no ERP. Motivo: {m.emergency_reason}
+          </Alert>
+        )}
+
         <div className="grid gap-4 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader title="Dados da movimentação" />
@@ -369,12 +375,20 @@ export function MovementDetailPage() {
 
           <Card>
             <CardHeader title="SA (ERP)" />
-            <dl className="space-y-3">
-              <KeyValue label="Número da SA" value={m.sa_number ? <span className="font-mono text-base font-semibold">{m.sa_number}</span> : <span className="text-orange-700">Pendente</span>} />
-              <KeyValue label="Informada por" value={m.sa_informed_by_name} />
-              <KeyValue label="Informada em" value={m.sa_informed_at ? fmtDateTime(m.sa_informed_at) : null} />
-              <KeyValue label="Baixa no ERP confirmada em" value={m.completed_at ? `${fmtDateTime(m.completed_at)} · ${m.completed_by_name ?? ''}` : null} />
-            </dl>
+            {m.is_emergency ? (
+              <dl className="space-y-3">
+                <KeyValue label="Número da SA" value="Não se aplica (ME emergencial)" />
+                <KeyValue label="Baixa no ERP" value="Não se aplica (ME emergencial)" />
+                <KeyValue label="Concluída em" value={m.completed_at ? `${fmtDateTime(m.completed_at)} · ${m.completed_by_name ?? ''}` : 'Aguardando confirmação do solicitante'} />
+              </dl>
+            ) : (
+              <dl className="space-y-3">
+                <KeyValue label="Número da SA" value={m.sa_number ? <span className="font-mono text-base font-semibold">{m.sa_number}</span> : <span className="text-orange-700">Pendente</span>} />
+                <KeyValue label="Informada por" value={m.sa_informed_by_name} />
+                <KeyValue label="Informada em" value={m.sa_informed_at ? fmtDateTime(m.sa_informed_at) : null} />
+                <KeyValue label="Baixa no ERP confirmada em" value={m.completed_at ? `${fmtDateTime(m.completed_at)} · ${m.completed_by_name ?? ''}` : null} />
+              </dl>
+            )}
           </Card>
 
           <Card className="lg:col-span-2">

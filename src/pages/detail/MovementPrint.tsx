@@ -151,7 +151,7 @@ export function MovementPrint({ detail, signatureUrl, companyName }: Props) {
 
       <div className="mt-2 flex flex-wrap justify-between gap-2 text-[10px] text-slate-700">
         <span>Status: {STATUS_LABELS[m.status]}</span>
-        <span>SA: {m.sa_number ?? 'pendente'}</span>
+        <span>{m.is_emergency ? 'ME EMERGENCIAL (só controle)' : `SA: ${m.sa_number ?? 'pendente'}`}</span>
         {m.notes && <span className="w-full">Observações: {m.notes}</span>}
         {m.status === 'cancelada' && (
           <span className="w-full font-semibold text-red-700">
