@@ -42,10 +42,14 @@ export function StepSuccess({ created, onNew }: { created: CreatedInfo; onNew: (
         <p className="mt-1 font-mono text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{created.me_number}</p>
         <p className="mt-2 text-slate-600">Estoque {created.warehouse_name}</p>
         <div className="mt-3 flex justify-center">
-          <StatusBadge status={created.status as MovementStatus} />
+          <StatusBadge status={created.status as MovementStatus} emergency={created.emergency} />
         </div>
         <p className="mt-4 text-sm text-slate-500">
-          A movimentação já aparece no painel. A equipe de lançamento informará o número da SA após o registro no ERP.
+          {created.emergency
+            ? 'ME emergencial registrada só para controle: não vai para a equipe de SA nem para a baixa no ERP.'
+            : created.status === 'sa_informada'
+              ? 'A movimentação já aparece no painel. Sem ativo fixo, vai direto para o almoxarifado lançar no ERP.'
+              : 'A movimentação já aparece no painel. A equipe de lançamento informará o número da SA após o registro no ERP.'}
         </p>
         <div className="mt-6 grid gap-2">
           <Button size="xl" icon={<PackageMinus className="h-6 w-6" />} onClick={onNew}>

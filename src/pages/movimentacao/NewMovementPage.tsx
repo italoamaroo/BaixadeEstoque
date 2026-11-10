@@ -36,6 +36,8 @@ export interface CreatedInfo {
   warehouse_name: string;
   /** guardada no aparelho (sem internet), aguardando envio */
   offline?: boolean;
+  /** ME emergencial (só controle) */
+  emergency?: boolean;
 }
 
 export function NewMovementPage() {

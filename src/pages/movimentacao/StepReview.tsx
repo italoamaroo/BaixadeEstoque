@@ -50,8 +50,10 @@ export function StepReview({ draft, update, goTo, back, rules, onCreated }: Step
     service_order_text: d.service_order_text || null,
     fixed_asset_text: d.fixed_asset_text || null,
     application_location_id: d.application_location_id || null,
-    application_location_text: d.application_location_id ? null : d.application_location_text || null,
+    application_location_text: d.application_location_id ? null : d.application_location_text || '-',
     notes: d.notes || null,
+    emergency: Boolean(d.emergency),
+    emergency_reason: d.emergency ? (d.emergency_reason ?? '').trim() : null,
     requester_employee_id: draft.requester?.id,
     received_by_employee_id: (draft.receiver ?? draft.requester)?.id,
     items: toPayloadItems(draft.cart),
@@ -136,7 +138,7 @@ export function StepReview({ draft, update, goTo, back, rules, onCreated }: Step
       }
 
       toast.success(`ME ${result.me_number} gerada com sucesso.`);
-      onCreated({ id: result.id, me_number: result.me_number, status: result.status, warehouse_name: warehouse.name });
+      onCreated({ id: result.id, me_number: result.me_number, status: result.status, warehouse_name: warehouse.name, emergency: Boolean(d.emergency) });
     } catch (err) {
       const msg = errorMessage(err);
       const net = isNetworkError(err);
@@ -182,6 +184,13 @@ export function StepReview({ draft, update, goTo, back, rules, onCreated }: Step
             <KeyValue label="Ativo fixo" value={d.fixed_asset_text} />
             <KeyValue label="Local de aplicação" value={name(data.application_locations, d.application_location_id) ?? d.application_location_text} />
             <KeyValue label="Observações" value={d.notes} className="col-span-2 sm:col-span-3" />
+            {d.emergency && (
+              <KeyValue
+                label="ME emergencial (só controle)"
+                value={d.emergency_reason}
+                className="col-span-2 rounded-lg bg-orange-50 p-2 ring-1 ring-inset ring-orange-200 sm:col-span-3"
+              />
+            )}
           </dl>
         </section>
 

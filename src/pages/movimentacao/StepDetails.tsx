@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useLookups } from '@/hooks/useLookups';
 import { Button } from '@/components/ui/Button';
-import { Input, Select, Textarea } from '@/components/ui/Field';
+import { FixedField, Input, Select, Textarea } from '@/components/ui/Field';
+import { EmergencyFields } from '@/components/EmergencyFields';
+import { useFixedContract } from '@/hooks/useFixedContract';
 import { Alert, Card } from '@/components/ui/Card';
 import { PageLoader } from '@/components/ui/Spinner';
 import { fieldErrors, movementDetailsSchema, type MovementDetails } from '@/lib/validation';
@@ -12,6 +14,19 @@ export function StepDetails({ draft, update, next, back }: StepProps) {
   const { data, loading, error } = useLookups(['contracts', 'sectors', 'service_fronts', 'service_orders', 'fixed_assets', 'application_locations']);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const d = draft.details;
+  const fixedContract = useFixedContract(data.contracts);
+
+  // Contrato fixo e local de aplicação fixo ("-")
+  useEffect(() => {
+    const patch: Partial<MovementDetails> = {};
+    if (fixedContract && d.contract_id !== fixedContract.id) patch.contract_id = fixedContract.id;
+    if (d.application_location_id || d.application_location_text !== '-') {
+      patch.application_location_id = '';
+      patch.application_location_text = '-';
+    }
+    if (Object.keys(patch).length) update({ details: { ...d, ...patch } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fixedContract?.id, d.contract_id, d.application_location_id, d.application_location_text]);
 
   const set = <K extends keyof MovementDetails>(k: K, v: MovementDetails[K]) => {
     update({ details: { ...d, [k]: v } });
@@ -19,7 +34,7 @@ export function StepDetails({ draft, update, next, back }: StepProps) {
   };
 
   const proceed = () => {
-    const r = movementDetailsSchema.safeParse({ ...d, warehouse_id: draft.warehouse_id });
+    const r = movementDetailsSchema.safeParse({ ...d, warehouse_id: draft.warehouse_id, contract_id: fixedContract?.id ?? d.contract_id });
     const errs = fieldErrors(r);
     setErrors(errs);
     if (Object.keys(errs).length === 0) next();
@@ -35,14 +50,18 @@ export function StepDetails({ draft, update, next, back }: StepProps) {
         <p className="mb-5 text-sm text-slate-500">Mesmos campos do formulário de Movimentação de Estoque.</p>
         {error && <Alert tone="error">{error}</Alert>}
         <div className="grid gap-4 sm:grid-cols-2">
-          <Select label="Contrato" required value={d.contract_id} onChange={(e) => set('contract_id', e.target.value)} error={errors.contract_id} inputSize="lg">
-            <option value="">Selecione…</option>
-            {(data.contracts ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.code} – {c.name}
-              </option>
-            ))}
-          </Select>
+          {fixedContract ? (
+            <FixedField label="Contrato" value={`${fixedContract.code} – ${fixedContract.name}`} hint="Contrato fixo (definido em Parâmetros)." />
+          ) : (
+            <Select label="Contrato" required value={d.contract_id} onChange={(e) => set('contract_id', e.target.value)} error={errors.contract_id} inputSize="lg">
+              <option value="">Selecione…</option>
+              {(data.contracts ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code} – {c.name}
+                </option>
+              ))}
+            </Select>
+          )}
           <Select label="Setor" required value={d.sector_id} onChange={(e) => set('sector_id', e.target.value)} error={errors.sector_id} inputSize="lg">
             <option value="">Selecione…</option>
             {(data.sectors ?? []).map((c) => (
@@ -96,9 +115,11 @@ export function StepDetails({ draft, update, next, back }: StepProps) {
             maxLength={40}
             error={errors.fixed_asset_text}
             hint={
-              (d.fixed_asset_text ?? '').trim()
-                ? 'Com ativo fixo: a ME vai para a equipe de SA e depois para a baixa no ERP.'
-                : 'Sem ativo fixo: a ME não passa pela SA, vai direto para o almoxarifado lançar no ERP.'
+              d.emergency
+                ? 'ME emergencial: fica só para controle (sem SA e sem baixa no ERP).'
+                : (d.fixed_asset_text ?? '').trim()
+                  ? 'Com ativo fixo: a ME vai para a equipe de SA e depois para a baixa no ERP.'
+                  : 'Sem ativo fixo: a ME não passa pela SA, vai direto para o almoxarifado lançar no ERP.'
             }
             inputSize="lg"
           />
@@ -109,28 +130,7 @@ export function StepDetails({ draft, update, next, back }: StepProps) {
               </option>
             ))}
           </datalist>
-          <Select
-            label="Local de aplicação"
-            value={d.application_location_id ?? ''}
-            onChange={(e) => set('application_location_id', e.target.value)}
-            inputSize="lg"
-          >
-            <option value="">Outro / não cadastrado</option>
-            {(data.application_locations ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
-          {!d.application_location_id && (
-            <Input
-              label="Descreva o local de aplicação"
-              value={d.application_location_text ?? ''}
-              onChange={(e) => set('application_location_text', e.target.value)}
-              maxLength={120}
-              inputSize="lg"
-            />
-          )}
+          <FixedField label="Local de aplicação" value="-" hint="Campo fixo." />
           <Textarea
             label="Observações"
             value={d.notes ?? ''}
@@ -138,6 +138,14 @@ export function StepDetails({ draft, update, next, back }: StepProps) {
             maxLength={2000}
             wrapClassName="sm:col-span-2"
             error={errors.notes}
+          />
+          <EmergencyFields
+            emergency={Boolean(d.emergency)}
+            reason={d.emergency_reason ?? ''}
+            onEmergency={(v) => set('emergency', v)}
+            onReason={(v) => set('emergency_reason', v)}
+            error={errors.emergency_reason}
+            className="sm:col-span-2"
           />
         </div>
       </Card>
