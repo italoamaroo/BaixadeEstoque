@@ -3,7 +3,8 @@ import { toast } from 'sonner';
 import { Save } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Alert, Card, CardHeader, PageHeader } from '@/components/ui/Card';
-import { Checkbox, Input } from '@/components/ui/Field';
+import { Checkbox, Input, Select } from '@/components/ui/Field';
+import { useLookups } from '@/hooks/useLookups';
 import { PageLoader } from '@/components/ui/Spinner';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSettings, updateSettings } from '@/lib/api';
@@ -23,6 +24,7 @@ export function SettingsPage() {
   const [s, setS] = useState<Settings | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { data: lk } = useLookups(['contracts']);
 
   useEffect(() => {
     getSettings().then(setS).catch((e) => setError(errorMessage(e)));
@@ -85,6 +87,25 @@ export function SettingsPage() {
         <div className="space-y-4">
           <Checkbox label="Número da SA único" description="Impede vincular a mesma SA a duas MEs (exceto canceladas)." checked={s.sa_number_unique} onChange={(v) => set('sa_number_unique', v)} />
           <Input label="Formato aceito (expressão regular)" value={s.sa_number_pattern} onChange={(e) => set('sa_number_pattern', e.target.value)} hint="Padrão: ^[A-Za-z0-9./-]{3,30}$" />
+        </div>
+      </Card>
+      <Card>
+        <CardHeader title="Campos fixos da saída" subtitle="Aparecem já preenchidos e travados no balcão e na Nova saída." />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Select
+            label="Contrato padrão (fixo)"
+            value={s.default_contract_id ?? ''}
+            onChange={(e) => set('default_contract_id', e.target.value || null)}
+            hint="Sem contrato padrão e com mais de um contrato ativo, a tela pede para escolher."
+          >
+            <option value="">Nenhum (escolher na tela)</option>
+            {(lk.contracts ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.code} – {c.name}
+              </option>
+            ))}
+          </Select>
+          <Input label="Local de aplicação" value="-" disabled hint="Sempre gravado como “-”." />
         </div>
       </Card>
       <Card>
