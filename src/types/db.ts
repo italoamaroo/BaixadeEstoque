@@ -30,6 +30,7 @@ export interface Settings {
   auto_complete_on_sa: boolean;
   timezone: string;
   company_name: string;
+  default_contract_id?: string | null;
   updated_at?: string;
 }
 
@@ -155,6 +156,8 @@ export interface MovementRow {
   updated_at: string;
   updated_by: string | null;
   updated_by_name: string | null;
+  is_emergency?: boolean;
+  emergency_reason?: string | null;
 }
 
 export interface MovementItem {

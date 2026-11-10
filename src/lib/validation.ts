@@ -4,7 +4,8 @@ const uuid = z.string().uuid();
 const optionalText = (max: number, label: string) =>
   z.string().trim().max(max, `${label}: máximo de ${max} caracteres.`).optional().or(z.literal(''));
 
-export const movementDetailsSchema = z.object({
+export const movementDetailsSchema = z
+  .object({
   warehouse_id: uuid.or(z.literal('')).refine((v) => v !== '', 'Selecione o estoque de origem.'),
   contract_id: z.string().min(1, 'Selecione o contrato.'),
   sector_id: z.string().min(1, 'Selecione o setor.'),
@@ -14,7 +15,15 @@ export const movementDetailsSchema = z.object({
   application_location_id: z.string().optional(),
   application_location_text: optionalText(120, 'Local de aplicação'),
   notes: optionalText(2000, 'Observações'),
-});
+  /** ME emergencial: somente controle (não vai para a SA nem para a baixa no ERP) */
+  emergency: z.boolean().optional(),
+  emergency_reason: optionalText(500, 'Motivo da emergência'),
+  })
+  .superRefine((v, ctx) => {
+    if (v.emergency && (v.emergency_reason ?? '').trim().length < 5) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['emergency_reason'], message: 'Informe o motivo da emergência (mínimo de 5 caracteres).' });
+    }
+  });
 export type MovementDetails = z.infer<typeof movementDetailsSchema>;
 
 export const requesterSchema = z.object({

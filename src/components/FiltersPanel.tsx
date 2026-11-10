@@ -167,6 +167,11 @@ export function FiltersPanel({ value, onApply, quickSearch = true, defaultOpen =
               </option>
             ))}
           </Select>
+          <Select label="Tipo de ME" value={draft.emergency} onChange={(e) => set('emergency', e.target.value as MovementFilters['emergency'])}>
+            <option value="">Todas</option>
+            <option value="nao">Normais</option>
+            <option value="sim">Emergenciais (só controle)</option>
+          </Select>
           <Input label="Requisitante (nome ou matrícula)" value={draft.requester} onChange={(e) => set('requester', e.target.value)} />
           <Select label="Almoxarife (responsável pela baixa)" value={draft.storekeeper_id} onChange={(e) => set('storekeeper_id', e.target.value)}>
             <option value="">Todos</option>

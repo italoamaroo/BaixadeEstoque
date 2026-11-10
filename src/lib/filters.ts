@@ -23,6 +23,8 @@ export interface MovementFilters {
   storekeeper_id: string;
   responsible_user_id: string;
   pending_sa: boolean;
+  /** '' = todas · 'sim' = só emergenciais · 'nao' = só normais */
+  emergency: '' | 'sim' | 'nao';
   q: string;
 }
 
@@ -46,6 +48,7 @@ export const EMPTY_FILTERS: MovementFilters = {
   storekeeper_id: '',
   responsible_user_id: '',
   pending_sa: false,
+  emergency: '',
   q: '',
 };
 
@@ -82,6 +85,8 @@ export function describeFilters(f: Partial<MovementFilters>, warehouses: Warehou
   lines.push(`Estoque: ${wh ? wh.name : 'Todos os autorizados'}`);
   if (f.status?.length) lines.push(`Status: ${f.status.map((s) => STATUS_LABELS[s]).join(', ')}`);
   if (f.pending_sa) lines.push('Somente pendências de SA');
+  if (f.emergency === 'sim') lines.push('Somente MEs emergenciais');
+  if (f.emergency === 'nao') lines.push('Sem MEs emergenciais');
   const extras: [keyof MovementFilters, string][] = [
     ['me_number', 'ME'], ['sa_number', 'SA'], ['material', 'Material'], ['material_code', 'Código'],
     ['reference', 'Referência'], ['unit', 'Unidade'], ['service_order', 'OS'], ['fixed_asset', 'Ativo fixo'],

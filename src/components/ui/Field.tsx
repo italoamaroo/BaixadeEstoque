@@ -136,3 +136,19 @@ export function Checkbox({
     </div>
   );
 }
+
+/** Campo fixo (somente leitura), com a mesma aparência dos demais campos. */
+export function FixedField({ label, value, hint, className }: { label: ReactNode; value: ReactNode; hint?: ReactNode; className?: string }) {
+  const id = useId();
+  return (
+    <FieldWrap label={label} hint={hint} id={id} className={className}>
+      <div
+        id={id}
+        className="flex min-h-[3rem] items-center rounded-lg bg-slate-50 px-3 text-base text-slate-800 ring-1 ring-inset ring-slate-200"
+        aria-readonly="true"
+      >
+        {value}
+      </div>
+    </FieldWrap>
+  );
+}

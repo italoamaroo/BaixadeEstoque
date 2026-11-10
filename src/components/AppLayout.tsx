@@ -24,7 +24,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWarehouse } from '@/contexts/WarehouseContext';
+import { ALL_WAREHOUSES, useWarehouse } from '@/contexts/WarehouseContext';
 import { ROLE_LABELS, type Permission } from '@/lib/constants';
 import { ConnectionBanner, ConnectionDot } from './ConnectionIndicator';
 
@@ -114,7 +114,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 function WarehouseSwitcher() {
-  const { current, options, setCurrentId } = useWarehouse();
+  const { current, options, setCurrentId, allSelected } = useWarehouse();
   if (options.length === 0) return null;
   if (options.length === 1) {
     return (
@@ -129,13 +129,14 @@ function WarehouseSwitcher() {
       <span className="sr-only">Estoque em operação</span>
       <select
         className="h-9 rounded-lg border-0 py-0 pl-3 pr-8 text-sm font-medium ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-brand-600"
-        value={current?.id ?? ''}
+        value={allSelected ? ALL_WAREHOUSES : (current?.id ?? '')}
         onChange={(e) => setCurrentId(e.target.value)}
-        title="Estoque em que você está operando"
+        title="Estoque em que você está operando (o Painel e as listas mostram só este estoque)"
       >
         <option value="" disabled>
           Selecione o estoque
         </option>
+        <option value={ALL_WAREHOUSES}>Todos os estoques</option>
         {options.map((w) => (
           <option key={w.id} value={w.id}>
             {w.name}

@@ -525,6 +525,7 @@ export interface CounterSnapshot {
     item_count: number;
     total_delivered: number;
     fixed_asset: string | null;
+    is_emergency?: boolean;
   };
   items: {
     id: string;
@@ -548,7 +549,10 @@ export interface CounterOpenPayload {
   service_order_text?: string | null;
   fixed_asset_text?: string | null;
   application_location_id?: string | null;
+  application_location_text?: string | null;
   notes?: string | null;
+  emergency?: boolean;
+  emergency_reason?: string | null;
   requester_employee_id: string;
   terminal_user_id?: string | null;
   reuse_terminal?: boolean;

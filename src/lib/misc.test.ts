@@ -90,3 +90,21 @@ describe('importação de planilha do ERP', () => {
     expect(rows[0]).toEqual({ code: 'A1', name: 'Filtro', unit: 'UN' });
   });
 });
+
+describe('planilha de etiquetas', () => {
+  it('lê código e cópias, soma repetidos e usa descrição como nome', async () => {
+    const { labelMatrixToRows } = await import('./import');
+    const rows = labelMatrixToRows([
+      ['Lista para etiquetas'],
+      ['Cód. Produto', 'Descrição do Produto', 'UM', 'Qtd'],
+      ['bc002a83', 'ADESIVO LOCTITE 496 50G', 'UN', 3],
+      ['BC002A83', '', '', 2],
+      ['AA001466D', 'SERRA COPO', 'PC', ''],
+    ]);
+    expect(rows.map((r) => [r.code, r.copies])).toEqual([
+      ['BC002A83', 5],
+      ['AA001466D', 1],
+    ]);
+    expect(rows[0].material).toMatchObject({ code: 'BC002A83', name: 'ADESIVO LOCTITE 496 50G', unit: 'UN' });
+  });
+});

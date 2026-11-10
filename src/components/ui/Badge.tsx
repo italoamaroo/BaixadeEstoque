@@ -11,8 +11,23 @@ export function Badge({ children, className }: { children: ReactNode; className?
   );
 }
 
-export function StatusBadge({ status }: { status: MovementStatus }) {
-  return <Badge className={STATUS_STYLES[status]}>{STATUS_LABELS[status]}</Badge>;
+const EMERGENCY_STYLE = 'bg-orange-50 text-orange-800 ring-orange-300';
+
+/** Selo da ME emergencial (retirada só para controle: sem SA e sem baixa no ERP). */
+export function EmergencyBadge() {
+  return <Badge className={EMERGENCY_STYLE}>Emergencial</Badge>;
+}
+
+export function StatusBadge({ status, emergency }: { status: MovementStatus; emergency?: boolean }) {
+  if (emergency && status === 'concluida') {
+    return <Badge className={EMERGENCY_STYLE}>Emergencial · controle</Badge>;
+  }
+  return (
+    <>
+      <Badge className={STATUS_STYLES[status]}>{STATUS_LABELS[status]}</Badge>
+      {emergency && status !== 'cancelada' && <EmergencyBadge />}
+    </>
+  );
 }
 
 export function ActiveBadge({ active }: { active: boolean }) {

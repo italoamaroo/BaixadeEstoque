@@ -195,7 +195,7 @@ export async function buildMovementsPdf(
         ['Frente/Equip.', m.service_front_name ?? '—', 'Ordem de serviço', m.service_order ?? '—'],
         ['Ativo fixo', m.fixed_asset ?? '—', 'Local de aplicação', m.application_location ?? '—'],
         ['Requisitante', `${m.requester_name} (${m.requester_registration})`, 'Almoxarife', m.storekeeper_name ?? '—'],
-        ['Número da SA', m.sa_number ?? 'Pendente', 'SA informada em', m.sa_informed_at ? fmtDateTime(m.sa_informed_at) : '—'],
+        ['Número da SA', m.is_emergency ? 'Não se aplica (emergencial)' : (m.sa_number ?? 'Pendente'), 'SA informada em', m.sa_informed_at ? fmtDateTime(m.sa_informed_at) : '—'],
         ...(m.notes ? [['Observações', { content: m.notes, colSpan: 3 }]] : []),
       ]),
       margin: { left: M, right: M },

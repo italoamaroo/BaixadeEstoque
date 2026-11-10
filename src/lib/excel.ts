@@ -31,6 +31,8 @@ export const SUMMARY_COLUMNS: ColumnDef[] = [
   { header: 'Usuário que Informou a SA', key: 'sa_informed_by_name', width: 24 },
   { header: 'Motivo do Cancelamento', key: 'cancel_reason', width: 30 },
   { header: 'Observações', key: 'notes', width: 36 },
+  { header: 'Emergencial', key: 'emergency_label', width: 12 },
+  { header: 'Motivo da Emergência', key: 'emergency_reason', width: 30 },
 ];
 
 export const ITEM_COLUMNS: ColumnDef[] = [
@@ -58,6 +60,7 @@ export const ITEM_COLUMNS: ColumnDef[] = [
   { header: 'Status', key: 'status_label', width: 20 },
   { header: 'Responsável pela Baixa', key: 'storekeeper_name', width: 24 },
   { header: 'Observação do Item', key: 'item_notes', width: 30 },
+  { header: 'Emergencial', key: 'emergency_label', width: 12 },
 ];
 
 /**
@@ -80,7 +83,8 @@ export function mapExportRows(rows: Record<string, unknown>[]): Record<string, u
       date: at,
       time: at,
       sa_informed_at: toExcelLocalDate(r.sa_informed_at as string | null),
-      status_label: STATUS_LABELS[r.status as MovementStatus] ?? r.status,
+      status_label: r.is_emergency && r.status === 'concluida' ? 'Emergencial (controle)' : (STATUS_LABELS[r.status as MovementStatus] ?? r.status),
+      emergency_label: r.is_emergency ? 'Sim' : 'Não',
       quantity_requested: r.quantity_requested !== undefined ? Number(r.quantity_requested) : undefined,
       quantity_delivered: r.quantity_delivered !== undefined ? Number(r.quantity_delivered) : undefined,
       item_count: r.item_count !== undefined ? Number(r.item_count) : undefined,
