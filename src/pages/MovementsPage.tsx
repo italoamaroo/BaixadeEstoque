@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRef, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, ClipboardList, Eye, FileSpreadsheet, Hourglass, PackageMinus, Printer } from 'lucide-react';
 import clsx from 'clsx';
@@ -15,6 +15,7 @@ import { errorMessage } from '@/lib/errors';
 import { filtersFromSearchParams, filtersToSearchParams, type MovementFilters } from '@/lib/filters';
 import { fmtDate, fmtDateTime, fmtTime } from '@/lib/format';
 import { useRealtimeMovements } from '@/hooks/useRealtimeMovements';
+import { useHeaderWarehouseFilter } from '@/hooks/useHeaderWarehouseFilter';
 import type { MovementRow } from '@/types/db';
 
 const SORTABLE: Record<string, string> = {
@@ -32,6 +33,7 @@ const SORTABLE: Record<string, string> = {
 export function MovementsPage() {
   const { can } = useAuth();
   const navigate = useNavigate();
+  useHeaderWarehouseFilter();
   const [params, setParams] = useSearchParams();
   const filters = useMemo(() => filtersFromSearchParams(params), [params]);
   const page = Number(params.get('pagina') ?? 1) || 1;
@@ -44,15 +46,20 @@ export function MovementsPage() {
   const [error, setError] = useState<string | null>(null);
   const [saTarget, setSaTarget] = useState<MovementRow | null>(null);
 
+  // só a resposta da busca mais recente vale (troca rápida de estoque/filtros)
+  const seq = useRef(0);
   const load = useCallback(async () => {
+    const my = ++seq.current;
     setLoading(true);
     try {
-      setData(await searchMovements(filters, page, pageSize, sort, dir));
+      const r = await searchMovements(filters, page, pageSize, sort, dir);
+      if (my !== seq.current) return;
+      setData(r);
       setError(null);
     } catch (err) {
-      setError(errorMessage(err));
+      if (my === seq.current) setError(errorMessage(err));
     } finally {
-      setLoading(false);
+      if (my === seq.current) setLoading(false);
     }
   }, [filters, page, pageSize, sort, dir]);
 
@@ -177,7 +184,7 @@ export function MovementsPage() {
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs">{m.sa_number ?? '—'}</td>
                       <td className="px-3 py-2.5">
-                        <StatusBadge status={m.status} />
+                        <StatusBadge status={m.status} emergency={m.is_emergency} />
                       </td>
                       <td className="max-w-[140px] truncate px-3 py-2.5 text-slate-600">{m.storekeeper_name}</td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-xs text-slate-500">
@@ -212,7 +219,7 @@ export function MovementsPage() {
                   <Link to={`/movimentacoes/${m.id}`} className="block px-4 py-3 hover:bg-slate-50">
                     <div className="flex items-start justify-between gap-2">
                       <span className="font-mono text-sm font-semibold text-brand-700">{m.me_number}</span>
-                      <StatusBadge status={m.status} />
+                      <StatusBadge status={m.status} emergency={m.is_emergency} />
                     </div>
                     <p className="mt-1 text-sm text-slate-900">{m.requester_name}</p>
                     <p className="truncate text-xs text-slate-500">{m.materials_summary}</p>

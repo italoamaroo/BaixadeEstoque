@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useRef, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Bar,
@@ -23,6 +23,7 @@ import { errorMessage } from '@/lib/errors';
 import { filtersFromSearchParams, filtersToSearchParams, type MovementFilters } from '@/lib/filters';
 import { fmtInt, fmtQty } from '@/lib/format';
 import { useRealtimeMovements } from '@/hooks/useRealtimeMovements';
+import { useHeaderWarehouseFilter } from '@/hooks/useHeaderWarehouseFilter';
 import type { DashboardData } from '@/types/db';
 
 const WH_COLORS = ['#1d43c4', '#0d9488', '#f97316', '#7c3aed', '#64748b'];
@@ -83,6 +84,7 @@ const short = (s: string, n = 22) => (s.length > n ? `${s.slice(0, n - 1)}…` :
 
 export function DashboardPage() {
   const { warehouses, can, displayName } = useAuth();
+  useHeaderWarehouseFilter();
   const [params, setParams] = useSearchParams();
   const filters = useMemo(() => filtersFromSearchParams(params), [params]);
   const [data, setData] = useState<DashboardData | null>(null);
@@ -94,14 +96,17 @@ export function DashboardPage() {
   const [repeatLoading, setRepeatLoading] = useState(true);
 
   const showRepeat = can('viewRepeatAlerts');
+  const repeatSeq = useRef(0);
   const loadRepeat = useCallback(async () => {
     if (!showRepeat) return;
+    const my = ++repeatSeq.current;
     try {
-      setRepeat(await getRepeatAssetWithdrawals(filters, repeatDays));
+      const r = await getRepeatAssetWithdrawals(filters, repeatDays);
+      if (my === repeatSeq.current) setRepeat(r);
     } catch {
-      setRepeat(null);
+      if (my === repeatSeq.current) setRepeat(null);
     } finally {
-      setRepeatLoading(false);
+      if (my === repeatSeq.current) setRepeatLoading(false);
     }
   }, [filters, repeatDays, showRepeat]);
   useEffect(() => {
@@ -109,14 +114,19 @@ export function DashboardPage() {
     void loadRepeat();
   }, [loadRepeat]);
 
+  // só a resposta mais recente vale (troca rápida de estoque/filtros)
+  const seq = useRef(0);
   const load = useCallback(async () => {
+    const my = ++seq.current;
     try {
-      setData(await getDashboard(filters));
+      const d = await getDashboard(filters);
+      if (my !== seq.current) return;
+      setData(d);
       setError(null);
     } catch (err) {
-      setError(errorMessage(err));
+      if (my === seq.current) setError(errorMessage(err));
     } finally {
-      setLoading(false);
+      if (my === seq.current) setLoading(false);
     }
   }, [filters]);
 
@@ -157,7 +167,11 @@ export function DashboardPage() {
     <div className="space-y-5">
       <PageHeader
         title="Painel"
-        subtitle={`Olá, ${displayName.split(' ')[0]}. Indicadores dos estoques autorizados${filters.warehouse_id ? '' : ' (consolidado)'}.`}
+        subtitle={`Olá, ${displayName.split(' ')[0]}. ${
+          filters.warehouse_id
+            ? `Indicadores do estoque ${warehouses.find((w) => w.id === filters.warehouse_id)?.name ?? ''}.`
+            : 'Indicadores de todos os estoques autorizados (consolidado).'
+        }`}
         actions={
           can('createMovement') && (
             <LinkButton to="/nova-saida" size="lg" icon={<PackageMinus className="h-5 w-5" />}>
