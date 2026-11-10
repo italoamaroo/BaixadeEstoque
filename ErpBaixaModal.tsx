@@ -85,15 +85,22 @@ export function ErpBaixaModal({ movement, onClose, onDone }: Props) {
     >
       {movement && (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-brand-50 p-3">
-            <div>
-              <p className="text-xs font-semibold uppercase text-brand-800">Número da SA para a baixa no ERP</p>
-              <p className="select-all font-mono text-2xl font-bold text-brand-900">{movement.sa_number}</p>
+          {movement.sa_number ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-brand-50 p-3">
+              <div>
+                <p className="text-xs font-semibold uppercase text-brand-800">Número da SA para a baixa no ERP</p>
+                <p className="select-all font-mono text-2xl font-bold text-brand-900">{movement.sa_number}</p>
+              </div>
+              <Button variant="secondary" icon={<Copy className="h-4 w-4" />} onClick={() => void copySa()}>
+                Copiar SA
+              </Button>
             </div>
-            <Button variant="secondary" icon={<Copy className="h-4 w-4" />} onClick={() => void copySa()}>
-              Copiar SA
-            </Button>
-          </div>
+          ) : (
+            <div className="rounded-lg bg-violet-50 p-3 text-violet-900">
+              <p className="text-xs font-semibold uppercase">ME sem ativo fixo</p>
+              <p className="text-sm">Não há SA: faça a baixa direto no ERP com os itens abaixo.</p>
+            </div>
+          )}
 
           <div>
             <p className="mb-1 text-sm font-semibold text-slate-700">Itens a baixar</p>
@@ -139,7 +146,7 @@ export function ErpBaixaModal({ movement, onClose, onDone }: Props) {
           </div>
 
           <Checkbox
-            label={`Confirmo que realizei a baixa no ERP com a SA ${movement.sa_number ?? ''}`}
+            label={movement.sa_number ? `Confirmo que realizei a baixa no ERP com a SA ${movement.sa_number}` : 'Confirmo que realizei a baixa destes itens no ERP'}
             description="Após confirmar, a ME fica Concluída e só pode ser alterada por gestor ou administrador."
             checked={confirmed}
             onChange={setConfirmed}
