@@ -51,6 +51,9 @@ type SizeKey = keyof typeof SIZES;
 /** etiquetas por lote de impressão, para o navegador e a impressora não travarem */
 const BATCH_SIZE = 300;
 /** limite total da lista */
+/** Identifica a linha da lista: o mesmo material pode sair com localizações diferentes. */
+const itemKey = (m: Material) => `${m.id}|${(m.location ?? '').toUpperCase()}`;
+
 const MAX_LABELS = 10000;
 const SIZE_KEY = 'baixas-estoque:etiqueta-tamanho';
 
@@ -134,7 +137,7 @@ function MaterialLabels() {
   }, [params]);
 
   const add = (m: Material) =>
-    setItems((list) => (list.some((x) => x.material.id === m.id) ? list : [...list, { material: m, copies: 1 }]));
+    setItems((list) => (list.some((x) => itemKey(x.material) === itemKey(m)) ? list : [...list, { material: m, copies: 1 }]));
 
   const print = async () => {
     if (labels.length > MAX_LABELS) {
@@ -164,7 +167,7 @@ function MaterialLabels() {
     setItems((current) => {
       const base = replace ? [] : [...current];
       for (const it of list) {
-        const ex = base.find((x) => x.material.id === it.material.id);
+        const ex = base.find((x) => itemKey(x.material) === itemKey(it.material));
         if (ex) ex.copies = Math.min(100, ex.copies + it.copies);
         else base.push({ ...it });
       }
@@ -257,11 +260,17 @@ function MaterialLabels() {
             ) : (
               <ul className="divide-y divide-slate-100">
                 {items.map((i) => (
-                  <li key={i.material.id} className="flex items-center justify-between gap-3 py-2">
+                  <li key={itemKey(i.material)} className="flex items-center justify-between gap-3 py-2">
                     <div className="min-w-0">
                       <p className="truncate font-medium">{i.material.name}</p>
                       <p className="text-xs text-slate-500">
                         {i.material.code} · {i.material.qr_code}
+                        {i.material.location ? (
+                          <>
+                            {' · '}
+                            <span className="font-semibold text-slate-700">Loc.: {i.material.location}</span>
+                          </>
+                        ) : null}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -274,7 +283,7 @@ function MaterialLabels() {
                           value={i.copies}
                           onChange={(e) =>
                             setItems((list) =>
-                              list.map((x) => (x.material.id === i.material.id ? { ...x, copies: Math.min(100, Math.max(1, Number(e.target.value) || 1)) } : x)),
+                              list.map((x) => (itemKey(x.material) === itemKey(i.material) ? { ...x, copies: Math.min(100, Math.max(1, Number(e.target.value) || 1)) } : x)),
                             )
                           }
                           className="ml-1 h-8 w-16 rounded-md border-0 text-center ring-1 ring-inset ring-slate-300"
@@ -284,7 +293,7 @@ function MaterialLabels() {
                         type="button"
                         aria-label="Remover"
                         className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                        onClick={() => setItems((list) => list.filter((x) => x.material.id !== i.material.id))}
+                        onClick={() => setItems((list) => list.filter((x) => itemKey(x.material) !== itemKey(i.material)))}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -344,7 +353,7 @@ function MaterialLabels() {
       >
         {batchLabels.map(({ material: m, n }, idx) => (
           <div
-            key={`${m.id}-${n}`}
+            key={`${itemKey(m)}-${n}`}
             style={{ width: s.w, height: s.h }}
             className={clsx(
               'flex items-center overflow-hidden bg-white text-black',
@@ -439,7 +448,8 @@ function ImportLabelsModal({
       const m = byCode.get(r.code);
       if (!m) missing.push(r);
       else if (!m.active) inactive.push(m);
-      else found.push({ material: m, copies: r.copies });
+      // a localização da planilha prevalece sobre a do cadastro (só na etiqueta)
+      else found.push({ material: r.location ? { ...m, location: r.location } : m, copies: r.copies });
     }
     return { rows, found, inactive, missing };
   };
