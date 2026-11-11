@@ -236,7 +236,29 @@ export interface AuditLog {
   source: string;
   ip_address: string | null;
   user_agent: string | null;
+  /** auditoria v2 (SQL 22) */
+  event_id?: string;
+  user_name?: string | null;
+  category?: AuditCategory | null;
+  actor_type?: 'usuario' | 'administrador' | 'terminal' | 'sistema' | null;
+  result?: 'sucesso' | 'falha' | 'negado';
+  reason_code?: string | null;
+  severity?: 'info' | 'aviso' | 'critico' | null;
+  correlation_id?: string | null;
+  chain_seq?: number | null;
 }
+
+export type AuditCategory =
+  | 'autenticacao'
+  | 'autorizacao'
+  | 'permissao'
+  | 'configuracao'
+  | 'dados'
+  | 'cadastro'
+  | 'privacidade'
+  | 'exportacao'
+  | 'auditoria'
+  | 'incidente';
 
 export interface AdminUser {
   id: string;
