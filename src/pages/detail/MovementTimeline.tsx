@@ -37,7 +37,7 @@ function AuditRow({ log, names }: { log: AuditLog; names: Record<string, string>
         <span className="min-w-0 flex-1">
           <span className="font-medium text-slate-900">{auditLabel(log.action)}</span>
           <span className="block text-xs text-slate-500">
-            {fmtDateTime(log.occurred_at)} · {log.user_id ? (names[log.user_id] ?? log.user_email) : 'Sistema'} · origem: {log.source}
+            {fmtDateTime(log.occurred_at)} · {log.user_id ? (log.user_name ?? names[log.user_id] ?? log.user_email ?? 'Usuário') : 'Sistema'} · origem: {log.source}
             {log.ip_address ? ` · IP ${log.ip_address}` : ''}
           </span>
           {log.justification && <span className="mt-0.5 block text-sm text-slate-700">Justificativa: {log.justification}</span>}
