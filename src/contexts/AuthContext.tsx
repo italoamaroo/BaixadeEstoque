@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { getAccess } from '@/lib/api';
+import { getAccess, logSession, reportLoginFailure } from '@/lib/api';
 import { cachedAccess, saveAccessCache } from '@/lib/offlineCache';
 import { can, type Permission } from '@/lib/constants';
 import { errorMessage, isNetworkError } from '@/lib/errors';
@@ -111,10 +111,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       can: (p) => can(roles, p),
       refreshAccess: () => loadAccess(session?.user.id ?? null),
       signIn: async (email, password) => {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
-        if (error) throw error;
+        const normalized = email.trim().toLowerCase();
+        const { error } = await supabase.auth.signInWithPassword({ email: normalized, password });
+        if (error) {
+          // Só senha/e-mail errados contam como falha de login (não erros de rede)
+          if (!isNetworkError(error) && /invalid login credentials/i.test(error.message)) reportLoginFailure(normalized);
+          throw error;
+        }
+        void logSession('login');
       },
       signOut: async () => {
+        await logSession('logout');
         await supabase.auth.signOut();
         setAccess(null);
         loadedFor.current = null;
