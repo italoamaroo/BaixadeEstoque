@@ -42,6 +42,7 @@ const PROBLEMS: Record<string, string> = {
   encadeamento_quebrado: 'o encadeamento entre eventos foi quebrado',
   sem_hash: 'há evento sem hash',
   hash_diferente_da_ancora: 'o hash atual é diferente do guardado na âncora',
+  descarte_nao_autorizado: 'há evento apagado sem pedido de descarte aprovado',
 };
 
 function isoDay(d: Date) {
@@ -402,6 +403,7 @@ export function AuditPage() {
                         <span className="text-xs text-slate-500">{AUDIT_CATEGORY_LABELS[r.category ?? ''] ?? ENTITY_LABELS[r.entity] ?? r.entity}</span>
                         <SeverityBadge s={r.severity} />
                         <ResultBadge r={r.result} />
+                        {r.purged_at && <span className="text-xs font-medium text-slate-500">· conteúdo descartado em {fmtDateTime(r.purged_at)}</span>}
                       </span>
                       <span className="block text-xs text-slate-500">
                         {fmtDateTime(r.occurred_at)} · {r.user_id ? (r.user_name ?? names[r.user_id] ?? r.user_email ?? 'Usuário') : 'Sistema'}

@@ -27,6 +27,8 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   useCounter: 'Balcão: separar com leitor sem fio e acompanhar no tablet',
   counterTerminal: 'Tablet do solicitante (somente a ME pareada)',
   viewAudit: 'Consultar auditoria',
+  viewSecurity: 'Ver alertas de segurança',
+  manageSecurity: 'Tratar alertas, retenção e descarte da auditoria',
   printLabels: 'Imprimir etiquetas QR Code',
   manageMasterData: 'Cadastros de materiais, QR Codes, funcionários e tabelas auxiliares (incluir, editar, importar)',
   manageWarehouses: 'Cadastro de estoques',
