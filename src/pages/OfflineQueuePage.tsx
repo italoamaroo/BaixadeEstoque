@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
-import { cacheInfo, refreshOfflineCache, type OfflineCacheInfo } from '@/lib/offlineCache';
+import { CACHE_VALID_MS, cacheInfo, refreshOfflineCache, type OfflineCacheInfo } from '@/lib/offlineCache';
 import { discardQueued, syncQueue, type QueuedMovement } from '@/lib/offlineQueue';
 import { errorMessage } from '@/lib/errors';
 import { fmtDateTime, fmtInt } from '@/lib/format';
@@ -117,7 +117,9 @@ export function OfflineQueuePage() {
         />
         {info ? (
           <p className="text-sm text-slate-600">
-            Atualizado em <strong>{fmtDateTime(info.updated_at)}</strong>: {fmtInt(info.materials)} materiais e {fmtInt(info.employees)} funcionários.
+            Atualizado em <strong>{fmtDateTime(info.updated_at)}</strong>: {fmtInt(info.materials)} materiais e {fmtInt(info.employees)} funcionários
+            (só nome e matrícula). Vale até <strong>{fmtDateTime(new Date(new Date(info.updated_at).getTime() + CACHE_VALID_MS))}</strong>; também é
+            apagada ao sair do sistema.
           </p>
         ) : (
           <p className="flex items-center gap-2 text-sm text-amber-700">
