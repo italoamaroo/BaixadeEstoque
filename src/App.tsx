@@ -27,6 +27,7 @@ const WarehousesPage = lazy(() => import('@/pages/admin/WarehousesPage').then((m
 const LookupsPage = lazy(() => import('@/pages/admin/LookupsPage').then((m) => ({ default: m.LookupsPage })));
 const UsersPage = lazy(() => import('@/pages/admin/UsersPage').then((m) => ({ default: m.UsersPage })));
 const RolesPage = lazy(() => import('@/pages/admin/RolesPage').then((m) => ({ default: m.RolesPage })));
+const IncidentsPage = lazy(() => import('@/pages/admin/IncidentsPage').then((m) => ({ default: m.IncidentsPage })));
 const SecurityPage = lazy(() => import('@/pages/admin/SecurityPage').then((m) => ({ default: m.SecurityPage })));
 const AuditPage = lazy(() => import('@/pages/admin/AuditPage').then((m) => ({ default: m.AuditPage })));
 const OfflineQueuePage = lazy(() => import('@/pages/OfflineQueuePage').then((m) => ({ default: m.OfflineQueuePage })));
@@ -79,6 +80,7 @@ function AppRoutes() {
               <Route path="admin/perfis" element={<RequirePermission perm="manageUsers"><RolesPage /></RequirePermission>} />
               <Route path="admin/auditoria" element={<RequirePermission perm="viewAudit"><AuditPage /></RequirePermission>} />
               <Route path="admin/seguranca" element={<RequirePermission perm="viewSecurity"><SecurityPage /></RequirePermission>} />
+              <Route path="admin/incidentes" element={<RequirePermission perm="manageIncidents"><IncidentsPage /></RequirePermission>} />
               <Route path="admin/configuracoes" element={<RequirePermission perm="manageSettings"><SettingsPage /></RequirePermission>} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>
