@@ -17,6 +17,7 @@ import {
   CloudOff,
   ScanLine,
   Settings,
+  ShieldAlert,
   ShieldCheck,
   UserCog,
   Users,
@@ -57,6 +58,7 @@ const ADMIN: NavItem[] = [
   { to: '/admin/usuarios', label: 'Usuários', icon: <UserCog className="h-5 w-5" />, perm: 'manageUsers' },
   { to: '/admin/perfis', label: 'Perfis e permissões', icon: <ShieldCheck className="h-5 w-5" />, perm: 'manageUsers' },
   { to: '/admin/auditoria', label: 'Auditoria', icon: <FileClock className="h-5 w-5" />, perm: 'viewAudit' },
+  { to: '/admin/seguranca', label: 'Segurança', icon: <ShieldAlert className="h-5 w-5" />, perm: 'viewSecurity' },
   { to: '/admin/configuracoes', label: 'Configurações', icon: <Settings className="h-5 w-5" />, perm: 'manageSettings' },
 ];
 
