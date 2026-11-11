@@ -839,3 +839,91 @@ export const requestPurge = (category: string, before: string, reason: string) =
   rpc<number>('purge_request', { p_category: category, p_before: before, p_reason: reason });
 export const decidePurge = (id: number, approve: boolean, note: string) =>
   rpc<{ status: string; eventos?: number }>('purge_decide', { p_id: id, p_approve: approve, p_note: note });
+
+// ---------------------------------------------------------------------------
+// Incidentes de segurança e configuração LGPD (fase 3)
+// ---------------------------------------------------------------------------
+export type IncidentRisk = 'a_avaliar' | 'sem_risco_relevante' | 'risco_relevante';
+export type DeadlineStatus = 'pendente' | 'atrasado' | 'cumprido' | 'cumprido_com_atraso' | null;
+export interface IncidentDeadlines {
+  aplica: boolean;
+  motivo: string | null;
+  pequeno_porte: boolean | null;
+  multiplicador: number;
+  hoje: string;
+  anpd_prazo: string | null;
+  anpd_dias_restantes: number | null;
+  anpd_situacao: DeadlineStatus;
+  titulares_prazo: string | null;
+  titulares_dias_restantes: number | null;
+  titulares_situacao: DeadlineStatus;
+  declaracao_prazo: string | null;
+  complementacao_prazo: string | null;
+}
+export interface SecurityIncident {
+  id: number;
+  code: string;
+  title: string;
+  status: 'aberto' | 'em_tratamento' | 'encerrado';
+  known_at: string;
+  personal_data_known_at: string | null;
+  occurred_at: string | null;
+  description: string | null;
+  data_categories: string[];
+  data_nature: string | null;
+  sensitive_data: boolean | null;
+  affected_count: number | null;
+  affected_count_note: string | null;
+  risk_criteria: string[];
+  risk_level: IncidentRisk;
+  risk_assessment: string | null;
+  measures: string | null;
+  anpd_communicated_at: string | null;
+  anpd_protocol: string | null;
+  titulares_communicated_at: string | null;
+  communication_form: string | null;
+  communication_content: string | null;
+  no_communication_reason: string | null;
+  alert_id: number | null;
+  created_at: string;
+  created_by_name: string | null;
+  updated_at: string;
+  updated_by_name: string | null;
+  closed_at: string | null;
+  closed_by_name: string | null;
+  closing_note: string | null;
+  prazos: IncidentDeadlines;
+  notes?: { id: number; kind: 'nota' | 'alteracao' | 'status'; body: string; created_at: string; created_by_name: string | null }[];
+}
+export interface PrivacySettings {
+  controller_name: string | null;
+  controller_doc: string | null;
+  dpo_name: string | null;
+  dpo_contact: string | null;
+  small_agent: boolean | null;
+  updated_at: string;
+  updated_by_name: string | null;
+}
+export interface Holiday {
+  day: string;
+  name: string;
+  scope: 'nacional' | 'estadual' | 'municipal' | 'empresa';
+}
+export interface IncidentOverview {
+  settings: PrivacySettings;
+  holidays: Holiday[];
+  incidents: SecurityIncident[];
+  open_alerts: { id: number; title: string; severity: string; created_at: string }[];
+}
+
+export const getIncidentOverview = () => rpc<IncidentOverview>('incident_overview');
+export const getIncident = (id: number) => rpc<SecurityIncident>('incident_get', { p_id: id });
+export const openIncident = (p: { title: string; known_at?: string; description?: string; alert_id?: number | null }) =>
+  rpc<number>('incident_open', { p });
+export const updateIncident = (id: number, p: Partial<SecurityIncident>) => rpc<SecurityIncident>('incident_update', { p_id: id, p });
+export const addIncidentNote = (id: number, body: string) => rpc<void>('incident_add_note', { p_id: id, p_body: body });
+export const closeIncident = (id: number, note: string) => rpc<void>('incident_close', { p_id: id, p_note: note });
+export const updatePrivacySettings = (p: Partial<PrivacySettings>) => rpc<void>('privacy_settings_update', { p });
+export const addHoliday = (day: string, name: string, scope: Holiday['scope']) =>
+  rpc<void>('holiday_add', { p_day: day, p_name: name, p_scope: scope });
+export const removeHoliday = (day: string) => rpc<void>('holiday_remove', { p_day: day });

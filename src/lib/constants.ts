@@ -65,6 +65,7 @@ export const PERMISSIONS = {
   viewAudit: ['gestor', 'admin'],
   viewSecurity: ['gestor', 'admin'],
   manageSecurity: ['admin'],
+  manageIncidents: ['admin'],
   viewRepeatAlerts: ['gestor', 'admin'],
   viewRequesterPhoto: ['gestor', 'admin'],
   printLabels: ['admin', 'gestor', 'almoxarife'],
@@ -137,6 +138,13 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'auditoria.descarte_rejeitado': 'Descarte de auditoria rejeitado',
   'auditoria.descarte_executado': 'Descarte de auditoria executado',
   'seguranca.verificacao': 'Verificações de segurança executadas',
+  'incidente.registrado': 'Incidente registrado',
+  'incidente.atualizado': 'Incidente atualizado',
+  'incidente.anotado': 'Anotação no incidente',
+  'incidente.encerrado': 'Incidente encerrado',
+  'privacidade.configuracao_alterada': 'Configuração LGPD alterada',
+  'privacidade.feriado_cadastrado': 'Feriado cadastrado',
+  'privacidade.feriado_removido': 'Feriado removido',
 };
 
 export const AUDIT_CATEGORY_LABELS: Record<string, string> = {
@@ -165,6 +173,8 @@ export const ALERT_RULE_LABELS: Record<string, string> = {
   coleta_parada: 'Coleta de eventos parada',
   retencao_vencendo: 'Retenção vencendo',
   descarte_executado: 'Descarte executado',
+  incidente_prazo: 'Prazo de comunicação de incidente',
+  incidente_sem_avaliacao: 'Incidente sem avaliação de risco',
 };
 export const ALERT_STATUS_LABELS: Record<string, string> = { aberto: 'Aberto', em_analise: 'Em análise', encerrado: 'Encerrado' };
 
