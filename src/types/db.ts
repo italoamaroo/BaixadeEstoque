@@ -246,6 +246,7 @@ export interface AuditLog {
   severity?: 'info' | 'aviso' | 'critico' | null;
   correlation_id?: string | null;
   chain_seq?: number | null;
+  purged_at?: string | null;
 }
 
 export type AuditCategory =
