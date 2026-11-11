@@ -66,6 +66,7 @@ export const PERMISSIONS = {
   viewSecurity: ['gestor', 'admin'],
   manageSecurity: ['admin'],
   manageIncidents: ['admin'],
+  manageDataRequests: ['admin'],
   viewRepeatAlerts: ['gestor', 'admin'],
   viewRequesterPhoto: ['gestor', 'admin'],
   printLabels: ['admin', 'gestor', 'almoxarife'],
@@ -145,6 +146,11 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'privacidade.configuracao_alterada': 'Configuração LGPD alterada',
   'privacidade.feriado_cadastrado': 'Feriado cadastrado',
   'privacidade.feriado_removido': 'Feriado removido',
+  'titular.pedido_registrado': 'Pedido de titular registrado',
+  'titular.pedido_atualizado': 'Pedido de titular atualizado',
+  'titular.pedido_anotado': 'Anotação em pedido de titular',
+  'titular.pedido_respondido': 'Pedido de titular respondido',
+  'titular.relatorio_gerado': 'Relatório de dados do titular gerado',
 };
 
 export const AUDIT_CATEGORY_LABELS: Record<string, string> = {
@@ -175,6 +181,7 @@ export const ALERT_RULE_LABELS: Record<string, string> = {
   descarte_executado: 'Descarte executado',
   incidente_prazo: 'Prazo de comunicação de incidente',
   incidente_sem_avaliacao: 'Incidente sem avaliação de risco',
+  titular_prazo: 'Prazo de resposta a titular',
 };
 export const ALERT_STATUS_LABELS: Record<string, string> = { aberto: 'Aberto', em_analise: 'Em análise', encerrado: 'Encerrado' };
 

@@ -46,6 +46,12 @@ function tx<T>(store: 'kv' | 'queue', mode: IDBTransactionMode, fn: (s: IDBObjec
 export const kvGet = <T>(key: string) => tx<T | undefined>('kv', 'readonly', (s) => s.get(key) as IDBRequest<T | undefined>).catch(() => undefined);
 export const kvSet = (key: string, value: unknown) => tx('kv', 'readwrite', (s) => s.put(value, key)).then(() => undefined);
 export const kvDel = (key: string) => tx('kv', 'readwrite', (s) => s.delete(key)).then(() => undefined);
+export const kvKeys = () => tx<IDBValidKey[]>('kv', 'readonly', (s) => s.getAllKeys()).catch(() => [] as IDBValidKey[]);
+/** Apaga todas as chaves que começam com o prefixo (ex.: "cache:"). Nunca toca na fila de saídas. */
+export async function kvClearPrefix(prefix: string) {
+  const keys = (await kvKeys()).filter((k) => typeof k === 'string' && k.startsWith(prefix));
+  for (const k of keys) await kvDel(k as string).catch(() => undefined);
+}
 
 export const queueAll = <T>() => tx<T[]>('queue', 'readonly', (s) => s.getAll() as IDBRequest<T[]>).catch(() => [] as T[]);
 export const queuePut = (value: unknown) => tx('queue', 'readwrite', (s) => s.put(value)).then(() => undefined);

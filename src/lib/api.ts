@@ -901,6 +901,8 @@ export interface PrivacySettings {
   dpo_name: string | null;
   dpo_contact: string | null;
   small_agent: boolean | null;
+  titular_channel?: string | null;
+  titular_response_days?: number;
   updated_at: string;
   updated_by_name: string | null;
 }
@@ -927,3 +929,64 @@ export const updatePrivacySettings = (p: Partial<PrivacySettings>) => rpc<void>(
 export const addHoliday = (day: string, name: string, scope: Holiday['scope']) =>
   rpc<void>('holiday_add', { p_day: day, p_name: name, p_scope: scope });
 export const removeHoliday = (day: string) => rpc<void>('holiday_remove', { p_day: day });
+
+// ---------------------------------------------------------------------------
+// Pedidos de titulares - LGPD art. 18 (fase 4)
+// ---------------------------------------------------------------------------
+export type DsrStatus = 'recebido' | 'em_analise' | 'atendido' | 'atendido_parcialmente' | 'indeferido';
+export interface DataSubjectRequest {
+  id: number;
+  code: string;
+  received_at: string;
+  channel: string | null;
+  requester_name: string;
+  requester_registration: string | null;
+  employee_id: string | null;
+  employee: { id: string; registration: string; full_name: string } | null;
+  rights: string[];
+  description: string | null;
+  identity_verified: boolean;
+  identity_method: string | null;
+  status: DsrStatus;
+  due_date: string;
+  responded_at: string | null;
+  response_summary: string | null;
+  denial_reason: string | null;
+  created_at: string;
+  created_by_name: string | null;
+  dias_restantes: number | null;
+  situacao_prazo: 'pendente' | 'atrasado' | 'cumprido' | 'cumprido_com_atraso';
+  notes?: { id: number; kind: string; body: string; created_at: string; created_by_name: string | null }[];
+}
+export interface DsrOverview {
+  settings: { titular_channel: string | null; titular_response_days: number; dpo_name: string | null; dpo_contact: string | null };
+  requests: DataSubjectRequest[];
+}
+export interface DsrEmployeeReport {
+  gerado_em: string;
+  pedido: string | null;
+  cadastro: { matricula: string; nome: string; cargo: string | null; setor: string | null; ativo: boolean; cadastrado_em: string; atualizado_em: string };
+  retiradas: { me: string; data: string; estoque: string; situacao: string; emergencial: boolean; itens: number; assinatura: boolean; foto: boolean }[];
+  fotos: number;
+  assinaturas: number;
+  eventos_de_auditoria_sobre_o_cadastro: number;
+  observacoes: string[];
+}
+
+export const getDsrOverview = () => rpc<DsrOverview>('dsr_overview');
+export const getDsr = (id: number) => rpc<DataSubjectRequest>('dsr_get', { p_id: id });
+export const openDsr = (p: {
+  requester_name: string;
+  requester_registration?: string;
+  employee_id?: string | null;
+  rights: string[];
+  channel?: string;
+  description?: string;
+  received_at?: string;
+}) => rpc<number>('dsr_open', { p });
+export const updateDsr = (id: number, p: Record<string, unknown>) => rpc<void>('dsr_update', { p_id: id, p });
+export const respondDsr = (id: number, outcome: 'atendido' | 'atendido_parcialmente' | 'indeferido', summary: string, denial: string | null) =>
+  rpc<void>('dsr_respond', { p_id: id, p_outcome: outcome, p_summary: summary, p_denial_reason: denial });
+export const addDsrNote = (id: number, body: string) => rpc<void>('dsr_add_note', { p_id: id, p_body: body });
+export const getDsrEmployeeReport = (employeeId: string, requestId: number | null) =>
+  rpc<DsrEmployeeReport>('dsr_employee_report', { p_employee_id: employeeId, p_request_id: requestId });
