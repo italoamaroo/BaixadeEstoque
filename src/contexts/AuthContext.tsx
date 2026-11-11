@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { getAccess, logSession, reportLoginFailure } from '@/lib/api';
-import { cachedAccess, saveAccessCache } from '@/lib/offlineCache';
+import { cachedAccess, clearOfflineCache, saveAccessCache } from '@/lib/offlineCache';
 import { can, type Permission } from '@/lib/constants';
 import { errorMessage, isNetworkError } from '@/lib/errors';
 import type { Access, AppRole, Settings, Warehouse } from '@/types/db';
@@ -123,6 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut: async () => {
         await logSession('logout');
         await supabase.auth.signOut();
+        // LGPD: a cópia local de cadastros sai junto (a fila de saídas não enviadas fica)
+        await clearOfflineCache().catch(() => undefined);
         setAccess(null);
         loadedFor.current = null;
       },
