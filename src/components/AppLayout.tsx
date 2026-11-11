@@ -18,6 +18,7 @@ import {
   ScanLine,
   Settings,
   ShieldAlert,
+  Siren,
   ShieldCheck,
   UserCog,
   Users,
@@ -59,6 +60,7 @@ const ADMIN: NavItem[] = [
   { to: '/admin/perfis', label: 'Perfis e permissões', icon: <ShieldCheck className="h-5 w-5" />, perm: 'manageUsers' },
   { to: '/admin/auditoria', label: 'Auditoria', icon: <FileClock className="h-5 w-5" />, perm: 'viewAudit' },
   { to: '/admin/seguranca', label: 'Segurança', icon: <ShieldAlert className="h-5 w-5" />, perm: 'viewSecurity' },
+  { to: '/admin/incidentes', label: 'Incidentes', icon: <Siren className="h-5 w-5" />, perm: 'manageIncidents' },
   { to: '/admin/configuracoes', label: 'Configurações', icon: <Settings className="h-5 w-5" />, perm: 'manageSettings' },
 ];
 
