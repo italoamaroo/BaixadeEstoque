@@ -19,6 +19,7 @@ import {
   Settings,
   ShieldAlert,
   Siren,
+  UserCheck,
   ShieldCheck,
   UserCog,
   Users,
@@ -61,6 +62,7 @@ const ADMIN: NavItem[] = [
   { to: '/admin/auditoria', label: 'Auditoria', icon: <FileClock className="h-5 w-5" />, perm: 'viewAudit' },
   { to: '/admin/seguranca', label: 'Segurança', icon: <ShieldAlert className="h-5 w-5" />, perm: 'viewSecurity' },
   { to: '/admin/incidentes', label: 'Incidentes', icon: <Siren className="h-5 w-5" />, perm: 'manageIncidents' },
+  { to: '/admin/titulares', label: 'Pedidos de titulares', icon: <UserCheck className="h-5 w-5" />, perm: 'manageDataRequests' },
   { to: '/admin/configuracoes', label: 'Configurações', icon: <Settings className="h-5 w-5" />, perm: 'manageSettings' },
 ];
 
