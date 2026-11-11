@@ -63,6 +63,8 @@ export const PERMISSIONS = {
   useCounter: ['almoxarife', 'gestor', 'admin'],
   counterTerminal: ['terminal'],
   viewAudit: ['gestor', 'admin'],
+  viewSecurity: ['gestor', 'admin'],
+  manageSecurity: ['admin'],
   viewRepeatAlerts: ['gestor', 'admin'],
   viewRequesterPhoto: ['gestor', 'admin'],
   printLabels: ['admin', 'gestor', 'almoxarife'],
@@ -115,6 +117,26 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'auditoria.ancora_conferida': 'Âncora da auditoria conferida',
   'etiquetas.impressas': 'Etiquetas impressas',
   'qr.leitura_nao_encontrada': 'QR Code não localizado',
+  'me.confirmacao_registrada': 'Confirmação registrada no balcão',
+  'auth.login': 'Entrada no sistema',
+  'auth.logout': 'Saída do sistema',
+  'auth.falha_login': 'Falha de login',
+  'auth.senha_alterada': 'Senha alterada',
+  'auth.recuperacao_solicitada': 'Recuperação de senha solicitada',
+  'auth.usuario_criado': 'Usuário criado (Supabase Auth)',
+  'auth.usuario_excluido': 'Usuário excluído (Supabase Auth)',
+  'auth.usuario_alterado': 'Usuário alterado (Supabase Auth)',
+  'acesso.negado': 'Acesso negado',
+  'alerta.aberto': 'Alerta de segurança aberto',
+  'alerta.atualizado': 'Alerta de segurança tratado',
+  'retencao.alterada': 'Prazo de retenção alterado',
+  'retencao.aprovada': 'Prazo de retenção aprovado',
+  'retencao_legal.aberta': 'Retenção legal aberta',
+  'retencao_legal.liberada': 'Retenção legal liberada',
+  'auditoria.descarte_solicitado': 'Descarte de auditoria solicitado',
+  'auditoria.descarte_rejeitado': 'Descarte de auditoria rejeitado',
+  'auditoria.descarte_executado': 'Descarte de auditoria executado',
+  'seguranca.verificacao': 'Verificações de segurança executadas',
 };
 
 export const AUDIT_CATEGORY_LABELS: Record<string, string> = {
@@ -132,6 +154,19 @@ export const AUDIT_CATEGORY_LABELS: Record<string, string> = {
 
 export const AUDIT_RESULT_LABELS: Record<string, string> = { sucesso: 'Sucesso', falha: 'Falha', negado: 'Negado' };
 export const AUDIT_SEVERITY_LABELS: Record<string, string> = { info: 'Informativo', aviso: 'Aviso', critico: 'Crítico' };
+
+export const ALERT_RULE_LABELS: Record<string, string> = {
+  falhas_login: 'Falhas de login',
+  falhas_login_em_massa: 'Falhas de login em massa',
+  acessos_negados: 'Acessos negados repetidos',
+  exportacoes_volume: 'Volume de exportações',
+  perfil_admin: 'Perfil de administrador',
+  integridade: 'Integridade da auditoria',
+  coleta_parada: 'Coleta de eventos parada',
+  retencao_vencendo: 'Retenção vencendo',
+  descarte_executado: 'Descarte executado',
+};
+export const ALERT_STATUS_LABELS: Record<string, string> = { aberto: 'Aberto', em_analise: 'Em análise', encerrado: 'Encerrado' };
 
 export function auditLabel(action: string): string {
   if (AUDIT_ACTION_LABELS[action]) return AUDIT_ACTION_LABELS[action];

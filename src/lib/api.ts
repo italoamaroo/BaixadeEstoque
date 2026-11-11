@@ -24,8 +24,42 @@ import type { LookupTable } from './constants';
 
 async function rpc<T>(fn: string, args?: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(fn, args);
-  if (error) throw toAppError(error);
+  if (error) {
+    if ((error as { code?: string }).code === '42501') reportAccessDenied(fn);
+    throw toAppError(error);
+  }
   return data as T;
+}
+
+// ---------------------------------------------------------------------------
+// Eventos de segurança relatados pela tela (o banco limita e marca a origem)
+// ---------------------------------------------------------------------------
+const deniedSent = new Map<string, number>();
+/** Relata ao banco um acesso negado (no máximo 1 por operação a cada minuto). Nunca falha. */
+export function reportAccessDenied(operation: string) {
+  if (operation === 'log_access_denied') return;
+  const now = Date.now();
+  if (now - (deniedSent.get(operation) ?? 0) < 60_000) return;
+  deniedSent.set(operation, now);
+  void supabase.rpc('log_access_denied', { p_operation: operation, p_code: '42501' }).then(
+    () => undefined,
+    () => undefined,
+  );
+}
+/** Login/saída registrados na auditoria. Nunca falha nem atrasa a tela. */
+export async function logSession(action: 'login' | 'logout') {
+  try {
+    await Promise.race([supabase.rpc('auth_log_session', { p_action: action }), new Promise((r) => setTimeout(r, 3000))]);
+  } catch {
+    /* auditoria de sessão não bloqueia o uso */
+  }
+}
+/** Falha de login (sem sessão). O banco grava só o e-mail mascarado e um hash. */
+export function reportLoginFailure(email: string) {
+  void supabase.rpc('report_login_failure', { p_email: email }).then(
+    () => undefined,
+    () => undefined,
+  );
 }
 
 function unwrap<T>(res: { data: T | null; error: unknown }): T {
@@ -723,3 +757,85 @@ export async function getPhotoUrl(path: string, expiresIn = 300): Promise<string
   if (error || !data) throw toAppError(error ?? new Error('Foto indisponível.'));
   return data.signedUrl;
 }
+
+// ---------------------------------------------------------------------------
+// Segurança: alertas, retenção, retenção legal e descarte (fase 2)
+// ---------------------------------------------------------------------------
+export interface SecurityAlert {
+  id: number;
+  created_at: string;
+  last_seen_at: string;
+  rule: string;
+  severity: 'info' | 'aviso' | 'critico';
+  title: string;
+  details?: Record<string, unknown> | null;
+  occurrences: number;
+  status: 'aberto' | 'em_analise' | 'encerrado';
+  handled_at: string | null;
+  handled_by_name: string | null;
+  resolution: string | null;
+}
+export interface RetentionPolicy {
+  category: string;
+  retain_days: number | null;
+  basis: string | null;
+  status: 'proposta' | 'aprovada';
+  updated_at: string;
+  updated_by_name: string | null;
+  approved_at: string | null;
+  approved_by_name: string | null;
+  events: number;
+}
+export interface LegalHold {
+  id: number;
+  reason: string;
+  date_from: string;
+  date_to: string;
+  category: string | null;
+  created_at: string;
+  created_by_name: string | null;
+  released_at: string | null;
+  release_reason: string | null;
+}
+export interface PurgeRequest {
+  id: number;
+  category: string;
+  before_date: string;
+  events: number;
+  reason: string;
+  status: 'pendente' | 'executado' | 'rejeitado';
+  requested_by: string;
+  requested_by_name: string | null;
+  requested_at: string;
+  decided_by_name: string | null;
+  decided_at: string | null;
+  decision_note: string | null;
+  purged: number | null;
+}
+export interface SecurityOverview {
+  is_admin: boolean;
+  alerts: SecurityAlert[];
+  last_checks: { at: string; integridade: boolean; importados_auth: number; alertas: number } | null;
+  open_count: number;
+  open_critical: number;
+  policies?: RetentionPolicy[];
+  holds?: LegalHold[];
+  purges?: PurgeRequest[];
+  admins?: number;
+  cron?: boolean;
+}
+
+export const getSecurityOverview = () => rpc<SecurityOverview>('security_overview');
+export const runSecurityChecks = () => rpc<{ alertas: number; importados_auth: number; integridade: { ok: boolean } }>('security_run_checks');
+export const updateSecurityAlert = (id: number, status: SecurityAlert['status'], resolution: string | null) =>
+  rpc<void>('security_alert_update', { p_id: id, p_status: status, p_resolution: resolution });
+export const setRetentionPolicy = (category: string, days: number, basis: string) =>
+  rpc<void>('retention_set_policy', { p_category: category, p_days: days, p_basis: basis });
+export const approveRetentionPolicy = (category: string) => rpc<void>('retention_approve_policy', { p_category: category });
+export const createLegalHold = (reason: string, from: string, to: string, category: string | null) =>
+  rpc<number>('legal_hold_create', { p_reason: reason, p_from: from, p_to: to, p_category: category });
+export const releaseLegalHold = (id: number, reason: string) => rpc<void>('legal_hold_release', { p_id: id, p_reason: reason });
+export const requestPurge = (category: string, before: string, reason: string) =>
+  rpc<number>('purge_request', { p_category: category, p_before: before, p_reason: reason });
+export const decidePurge = (id: number, approve: boolean, note: string) =>
+  rpc<{ status: string; eventos?: number }>('purge_decide', { p_id: id, p_approve: approve, p_note: note });
