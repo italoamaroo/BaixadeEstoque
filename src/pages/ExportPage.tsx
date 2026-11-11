@@ -53,7 +53,7 @@ export function ExportPage() {
       }
       const blob = await buildWorkbook(kind, rows, lines, displayName);
       downloadBlob(blob, fileName);
-      void logEvent('exportacao.excel', null, { tipo: kind, registros: rows.length, filtros: toRpcFilters(filters), arquivo: fileName });
+      // o registro da exportação é feito pelo servidor (exportacao.dados)
       toast.success(`${fmtInt(rows.length)} linha(s) exportada(s).`);
     } catch (err) {
       setError(errorMessage(err));
