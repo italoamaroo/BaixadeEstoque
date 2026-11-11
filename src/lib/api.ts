@@ -141,8 +141,10 @@ export async function getMovementDetail(id: string): Promise<MovementDetail | nu
 }
 
 export async function getMovementAudit(id: string): Promise<AuditLog[]> {
-  const res = await supabase.from('audit_logs').select('*').eq('movement_id', id).order('occurred_at');
-  return (unwrap(res) ?? []) as AuditLog[];
+  // somente pelo servidor: gestor/admin; gestor não recebe IP nem e-mail
+  const { data, error } = await supabase.rpc('movement_audit', { p_movement_id: id });
+  if (error) throw toAppError(error);
+  return (data ?? []) as AuditLog[];
 }
 
 /** URL assinada de curta duração (bucket privado). */
@@ -448,25 +450,68 @@ export interface AuditQuery {
   dateFrom?: string;
   dateTo?: string;
   search?: string;
+  category?: string;
+  result?: string;
+  severity?: string;
+  correlationId?: string;
 }
+
+function auditFilters(q: Omit<AuditQuery, 'page' | 'pageSize'>) {
+  return {
+    action: q.action || undefined,
+    entity: q.entity || undefined,
+    user_id: q.userId || undefined,
+    date_from: q.dateFrom || undefined,
+    date_to: q.dateTo || undefined,
+    q: q.search?.trim() || undefined,
+    category: q.category || undefined,
+    result: q.result || undefined,
+    severity: q.severity || undefined,
+    correlation_id: q.correlationId?.trim() || undefined,
+  };
+}
+
+/** Consulta da auditoria: só pelo servidor (limite de 100 por página e 366 dias; a consulta é registrada). */
 export async function listAudit(q: AuditQuery): Promise<{ rows: AuditLog[]; total: number }> {
-  let query = supabase
-    .from('audit_logs')
-    .select('*', { count: 'exact' })
-    .order('occurred_at', { ascending: false })
-    .range((q.page - 1) * q.pageSize, q.page * q.pageSize - 1);
-  if (q.action) query = query.ilike('action', `${q.action}%`);
-  if (q.entity) query = query.eq('entity', q.entity);
-  if (q.userId) query = query.eq('user_id', q.userId);
-  if (q.dateFrom) query = query.gte('occurred_at', `${q.dateFrom}T00:00:00-03:00`);
-  if (q.dateTo) query = query.lte('occurred_at', `${q.dateTo}T23:59:59.999-03:00`);
-  if (q.search?.trim()) {
-    const safe = q.search.trim().replace(/[%,()]/g, ' ');
-    query = query.or(`entity_id.ilike.%${safe}%,user_email.ilike.%${safe}%,justification.ilike.%${safe}%`);
-  }
-  const { data, error, count } = await query;
+  const { data, error } = await supabase.rpc('search_audit', { p_filters: auditFilters(q), p_page: q.page, p_page_size: q.pageSize });
   if (error) throw toAppError(error);
-  return { rows: (data ?? []) as AuditLog[], total: count ?? 0 };
+  const r = (data ?? {}) as { rows?: AuditLog[]; total?: number };
+  return { rows: r.rows ?? [], total: r.total ?? 0 };
+}
+
+/** Exportação da auditoria (somente administrador, com finalidade; máx. 10.000 eventos). */
+export async function exportAudit(q: Omit<AuditQuery, 'page' | 'pageSize'>, reason: string): Promise<AuditLog[]> {
+  const { data, error } = await supabase.rpc('export_audit', { p_filters: auditFilters(q), p_reason: reason });
+  if (error) throw toAppError(error);
+  return (data ?? []) as AuditLog[];
+}
+
+export interface AuditChainResult {
+  ok: boolean;
+  checked?: number;
+  last_seq?: number;
+  last_hash?: string;
+  problem?: string | null;
+  problem_seq?: number | null;
+  generated_at?: string;
+}
+
+export async function verifyAuditChain(): Promise<AuditChainResult> {
+  const { data, error } = await supabase.rpc('audit_verify_chain');
+  if (error) throw toAppError(error);
+  return data as AuditChainResult;
+}
+
+export async function createAuditAnchor(): Promise<AuditChainResult> {
+  const { data, error } = await supabase.rpc('audit_create_anchor');
+  if (error) throw toAppError(error);
+  return data as AuditChainResult;
+}
+
+export async function checkAuditAnchor(seq: number, hash: string): Promise<AuditChainResult> {
+  const { data, error } = await supabase.rpc('audit_check_anchor', { p_seq: seq, p_hash: hash });
+  if (error) throw toAppError(error);
+  return data as AuditChainResult;
 }
 
 // ---------------------------------------------------------------------------

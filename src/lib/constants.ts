@@ -107,9 +107,31 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'sa.informada': 'SA informada',
   'sa.corrigida': 'SA corrigida',
   'exportacao.excel': 'Exportação para Excel',
+  'exportacao.dados': 'Exportação de MEs (registrada no servidor)',
+  'auditoria.consultada': 'Auditoria consultada',
+  'auditoria.exportada': 'Auditoria exportada',
+  'auditoria.integridade_verificada': 'Integridade da auditoria verificada',
+  'auditoria.ancora_gerada': 'Âncora da auditoria gerada',
+  'auditoria.ancora_conferida': 'Âncora da auditoria conferida',
   'etiquetas.impressas': 'Etiquetas impressas',
   'qr.leitura_nao_encontrada': 'QR Code não localizado',
 };
+
+export const AUDIT_CATEGORY_LABELS: Record<string, string> = {
+  autenticacao: 'Autenticação',
+  autorizacao: 'Acesso negado',
+  permissao: 'Permissões',
+  configuracao: 'Configuração',
+  dados: 'Movimentações',
+  cadastro: 'Cadastros',
+  privacidade: 'Privacidade',
+  exportacao: 'Exportação e impressão',
+  auditoria: 'Auditoria',
+  incidente: 'Incidentes',
+};
+
+export const AUDIT_RESULT_LABELS: Record<string, string> = { sucesso: 'Sucesso', falha: 'Falha', negado: 'Negado' };
+export const AUDIT_SEVERITY_LABELS: Record<string, string> = { info: 'Informativo', aviso: 'Aviso', critico: 'Crítico' };
 
 export function auditLabel(action: string): string {
   if (AUDIT_ACTION_LABELS[action]) return AUDIT_ACTION_LABELS[action];
