@@ -235,9 +235,17 @@ function AlertsTab({ alerts, admin, onChanged }: { alerts: SecurityAlert[]; admi
               )}
             </div>
             {admin && a.status !== 'encerrado' && (
-              <Button size="sm" variant="secondary" onClick={() => open(a)}>
-                Tratar
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  to={`/admin/incidentes?alerta=${a.id}`}
+                  className="inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium text-red-700 ring-1 ring-inset ring-red-200 hover:bg-red-50"
+                >
+                  Registrar incidente
+                </Link>
+                <Button size="sm" variant="secondary" onClick={() => open(a)}>
+                  Tratar
+                </Button>
+              </div>
             )}
           </li>
         ))}

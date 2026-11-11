@@ -29,6 +29,7 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   viewAudit: 'Consultar auditoria',
   viewSecurity: 'Ver alertas de segurança',
   manageSecurity: 'Tratar alertas, retenção e descarte da auditoria',
+  manageIncidents: 'Registrar e tratar incidentes de segurança (LGPD)',
   printLabels: 'Imprimir etiquetas QR Code',
   manageMasterData: 'Cadastros de materiais, QR Codes, funcionários e tabelas auxiliares (incluir, editar, importar)',
   manageWarehouses: 'Cadastro de estoques',
