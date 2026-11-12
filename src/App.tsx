@@ -22,6 +22,7 @@ const SaPendingPage = lazy(() => import('@/pages/SaPendingPage').then((m) => ({ 
 const ExportPage = lazy(() => import('@/pages/ExportPage').then((m) => ({ default: m.ExportPage })));
 const MaterialsPage = lazy(() => import('@/pages/admin/MaterialsPage').then((m) => ({ default: m.MaterialsPage })));
 const LabelsPage = lazy(() => import('@/pages/admin/LabelsPage').then((m) => ({ default: m.LabelsPage })));
+const FacesPage = lazy(() => import('@/pages/admin/FacesPage').then((m) => ({ default: m.FacesPage })));
 const EmployeesPage = lazy(() => import('@/pages/admin/EmployeesPage').then((m) => ({ default: m.EmployeesPage })));
 const WarehousesPage = lazy(() => import('@/pages/admin/WarehousesPage').then((m) => ({ default: m.WarehousesPage })));
 const LookupsPage = lazy(() => import('@/pages/admin/LookupsPage').then((m) => ({ default: m.LookupsPage })));
@@ -74,6 +75,7 @@ function AppRoutes() {
               <Route path="cadastros/materiais" element={<RequirePermission perm="manageMasterData"><MaterialsPage /></RequirePermission>} />
               <Route path="cadastros/etiquetas" element={<RequirePermission perm="printLabels"><LabelsPage /></RequirePermission>} />
               <Route path="cadastros/funcionarios" element={<RequirePermission perm="manageMasterData"><EmployeesPage /></RequirePermission>} />
+              <Route path="cadastros/reconhecimento-facial" element={<RequirePermission perm="manageMasterData"><FacesPage /></RequirePermission>} />
               <Route path="cadastros/estoques" element={<RequirePermission perm="manageWarehouses"><WarehousesPage /></RequirePermission>} />
               <Route path="cadastros/auxiliares" element={<RequirePermission perm="manageMasterData"><LookupsPage /></RequirePermission>} />
 
