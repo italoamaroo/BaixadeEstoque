@@ -407,6 +407,8 @@ interface Analysis {
   found: { material: Material; copies: number }[];
   inactive: Material[];
   missing: LabelSheetRow[];
+  /** coluna de localização da planilha (null = não tem; vale a do cadastro) */
+  locationHeader: string | null;
 }
 
 /** Importa uma planilha (.xlsx/.csv) com os códigos dos materiais e gera as etiquetas de todos. */
@@ -437,7 +439,7 @@ function ImportLabelsModal({
     }
   }, [open]);
 
-  const analyze = async (rows: LabelSheetRow[]): Promise<Analysis> => {
+  const analyze = async (rows: LabelSheetRow[], locationHeader: string | null): Promise<Analysis> => {
     setProgress(`Procurando ${fmtInt(rows.length)} código(s) no cadastro…`);
     const mats = await getMaterialsByCodes(rows.map((r) => r.code));
     const byCode = new Map(mats.map((m) => [m.code.toUpperCase(), m]));
@@ -448,10 +450,10 @@ function ImportLabelsModal({
       const m = byCode.get(r.code);
       if (!m) missing.push(r);
       else if (!m.active) inactive.push(m);
-      // a localização da planilha prevalece sobre a do cadastro (só na etiqueta)
-      else found.push({ material: r.location ? { ...m, location: r.location } : m, copies: r.copies });
+      // planilha com coluna de localização: vale exatamente a da planilha (vazia = sem localização), só na etiqueta
+      else found.push({ material: r.location !== undefined ? { ...m, location: r.location || null } : m, copies: r.copies });
     }
-    return { rows, found, inactive, missing };
+    return { rows, found, inactive, missing, locationHeader };
   };
 
   const onFile = async (f: File | undefined) => {
@@ -460,9 +462,9 @@ function ImportLabelsModal({
     setAnalysis(null);
     setBusy(true);
     try {
-      const rows = await parseLabelsFile(f);
-      if (rows.length === 0) throw new Error('Nenhum código encontrado na planilha.');
-      setAnalysis(await analyze(rows));
+      const sheet = await parseLabelsFile(f);
+      if (sheet.rows.length === 0) throw new Error('Nenhum código encontrado na planilha.');
+      setAnalysis(await analyze(sheet.rows, sheet.locationHeader));
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -486,7 +488,7 @@ function ImportLabelsModal({
           const part = creatable.slice(i, i + 500).map((r) => r.material);
           await withRetry(() => importMaterials(part));
         }
-        result = await analyze(analysis.rows);
+        result = await analyze(analysis.rows, analysis.locationHeader);
         setAnalysis(result);
       }
       if (result.found.length === 0) throw new Error('Nenhum material ativo encontrado para gerar etiquetas.');
@@ -573,6 +575,17 @@ function ImportLabelsModal({
                 <p className="text-slate-600">inativos (ignorados)</p>
               </div>
             </div>
+            {analysis.locationHeader ? (
+              <Alert tone="info">
+                Localização: vale exatamente a da coluna <strong>“{analysis.locationHeader}”</strong> da planilha (linha sem localização sai
+                sem localização na etiqueta).
+              </Alert>
+            ) : (
+              <Alert tone="warning">
+                A planilha não tem coluna de localização reconhecida: as etiquetas vão usar a localização do cadastro. Para usar a da
+                planilha, dê à coluna o nome “localizacao”.
+              </Alert>
+            )}
             <p className="text-sm text-slate-700">
               Etiquetas a gerar: <strong>{fmtInt(totalLabels)}</strong>
               {totalLabels > BATCH_SIZE && <span className="text-orange-700"> · será impresso em lotes de {fmtInt(BATCH_SIZE)}</span>}
