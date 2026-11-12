@@ -121,6 +121,33 @@ describe('etiquetas: localização da planilha', () => {
     expect(rows).toHaveLength(3);
     expect(rows[0]).toMatchObject({ code: 'KN0821', copies: 3, location: 'B-18' });
     expect(rows[1]).toMatchObject({ code: 'KN0821', copies: 1, location: 'C-02' });
-    expect(rows[2].location).toBeUndefined();
+    expect(rows[2].location).toBe('');
+  });
+
+  it('reconhece variações do nome da coluna e não usa o cadastro quando a coluna existe', async () => {
+    const { labelMatrixToSheet } = await import('./import');
+    const a = labelMatrixToSheet([
+      ['Código', 'Local', 'Localização Física'],
+      ['X1', 'MURIBECA', 'D-03-02'],
+    ]);
+    expect(a.locationHeader).toBe('Localização Física');
+    expect(a.rows[0].location).toBe('D-03-02');
+    const b = labelMatrixToSheet([['Cod. Produto', 'Endereço no estoque'], ['X1', 'A-01']]);
+    expect(b.rows[0].location).toBe('A-01');
+    const c = labelMatrixToSheet([['codigo', 'qtd'], ['X1', '2']]);
+    expect(c.locationHeader).toBeNull();
+    expect(c.rows[0].location).toBeUndefined();
+  });
+});
+
+describe('texto da célula como aparece no Excel', () => {
+  it('mantém zeros à esquerda, casas decimais e datas', async () => {
+    const { displayText } = await import('./import');
+    expect(displayText(7, '000')).toBe('007');
+    expect(displayText(1.2, '00.00')).toBe('01.20');
+    expect(displayText(302, '00\\-00')).toBe('03-02');
+    expect(displayText(12, 'General')).toBe('12');
+    expect(displayText(new Date(Date.UTC(2026, 1, 3)), 'dd-mmm')).toBe('03-fev');
+    expect(displayText(new Date(Date.UTC(2026, 1, 3)), 'mm-dd-yy')).toBe('03/02/2026');
   });
 });
