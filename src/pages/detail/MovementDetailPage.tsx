@@ -35,6 +35,7 @@ import {
   listProfiles,
   logEvent,
   type MovementDetail,
+  movementIdentification,
 } from '@/lib/api';
 import { emptyDraft, stashDuplicate } from '@/lib/draft';
 import { errorMessage } from '@/lib/errors';
@@ -427,6 +428,7 @@ export function MovementDetailPage() {
               </div>
             )}
           </Card>
+          <IdentificationCard movementId={m.id} />
           {can('viewRequesterPhoto') && <RequesterPhotoCard movementId={m.id} />}
         </div>
 
@@ -545,5 +547,38 @@ export function MovementDetailPage() {
       <CorrectionModal open={modal === 'correct'} detail={detail} onClose={() => setModal(null)} onDone={() => void load()} />
       <ReplaceSignatureModal open={modal === 'signature'} detail={detail} onClose={() => setModal(null)} onDone={() => void load()} />
     </>
+  );
+}
+
+/** Como o solicitante foi identificado no balcão e como confirmou a retirada. */
+function IdentificationCard({ movementId }: { movementId: string }) {
+  const [info, setInfo] = useState<Awaited<ReturnType<typeof movementIdentification>>>(null);
+  useEffect(() => {
+    movementIdentification(movementId)
+      .then(setInfo)
+      .catch(() => setInfo(null));
+  }, [movementId]);
+  if (!info || (!info.identificado_por && info.confirmado_por !== 'facial')) return null;
+  const pct = (v: number | null) => (v == null ? '' : ` (semelhança ${Math.round(Number(v) * 100)}%)`);
+  return (
+    <Card>
+      <CardHeader title="Identificação do solicitante" />
+      <dl className="grid gap-3 text-sm">
+        <KeyValue
+          label="No início"
+          value={info.identificado_por === 'facial' ? `Reconhecido pelo rosto no tablet${pct(info.semelhanca_inicio)}` : info.identificado_por === 'manual' ? 'Identificado pelo almoxarife (matrícula)' : 'Escolhido pelo almoxarife'}
+        />
+        <KeyValue
+          label="Confirmação"
+          value={
+            info.confirmado_por === 'facial'
+              ? `Pelo rosto${pct(info.semelhanca_confirmacao)} · ${fmtDateTime(info.confirmado_em)}`
+              : info.confirmado_por === 'assinatura'
+                ? `Foto e assinatura · ${fmtDateTime(info.confirmado_em)}`
+                : 'Aguardando'
+          }
+        />
+      </dl>
+    </Card>
   );
 }
