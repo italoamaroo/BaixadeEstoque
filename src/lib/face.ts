@@ -18,7 +18,8 @@ export function loadFaceApi(): Promise<FaceApi> {
         await tf.setBackend('cpu');
       }
       await tf.ready();
-      const base = `${import.meta.env.BASE_URL ?? '/'}models/face`.replace('//', '/');
+      // modelos na raiz de public/ (arquivos *_model.bin e *-weights_manifest.json)
+      const base = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '') || '/';
       await Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri(base),
         faceapi.nets.faceLandmark68TinyNet.loadFromUri(base),
