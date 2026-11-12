@@ -24,8 +24,7 @@ import {
   UserCog,
   Users,
   Warehouse as WarehouseIcon,
-  X,
-} from 'lucide-react';
+  X, ScanFace } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ALL_WAREHOUSES, useWarehouse } from '@/contexts/WarehouseContext';
 import { ROLE_LABELS, type Permission } from '@/lib/constants';
@@ -52,6 +51,7 @@ const REGISTRY: NavItem[] = [
   { to: '/cadastros/materiais', label: 'Materiais', icon: <Boxes className="h-5 w-5" />, perm: 'manageMasterData' },
   { to: '/cadastros/etiquetas', label: 'Etiquetas QR Code', icon: <QrCode className="h-5 w-5" />, perm: 'printLabels' },
   { to: '/cadastros/funcionarios', label: 'Funcionários', icon: <Users className="h-5 w-5" />, perm: 'manageMasterData' },
+  { to: '/cadastros/reconhecimento-facial', label: 'Reconhecimento facial', icon: <ScanFace className="h-5 w-5" />, perm: 'manageMasterData' },
   { to: '/cadastros/estoques', label: 'Estoques', icon: <WarehouseIcon className="h-5 w-5" />, perm: 'manageWarehouses' },
   { to: '/cadastros/auxiliares', label: 'Cadastros auxiliares', icon: <Database className="h-5 w-5" />, perm: 'manageMasterData' },
 ];
