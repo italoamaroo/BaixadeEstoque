@@ -9,16 +9,27 @@ import { EmergencyFields } from '@/components/EmergencyFields';
 import { useFixedContract } from '@/hooks/useFixedContract';
 import { Alert, Card } from '@/components/ui/Card';
 import { PageLoader } from '@/components/ui/Spinner';
-import { counterListTerminals, counterOpen, suggestTerminal, type CounterTerminal } from '@/lib/api';
+import { counterListTerminals, counterOpen, counterRequestAttach, suggestTerminal, type CounterRequest, type CounterTerminal } from '@/lib/api';
+import { toast } from 'sonner';
+import { ScanFace } from 'lucide-react';
 import { errorMessage } from '@/lib/errors';
 import type { Employee } from '@/types/db';
 
 
 /** Abertura da separação no balcão: estoque, solicitante e dados da ME. */
-export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) => void }) {
+export function CounterOpenForm({
+  onOpened,
+  request = null,
+  onCancelRequest,
+}: {
+  onOpened: (movementId: string) => void;
+  /** pedido feito no tablet ("Retirar peças"): solicitante e tablet já vêm definidos */
+  request?: CounterRequest | null;
+  onCancelRequest?: () => void;
+}) {
   const { current, options, setCurrentId } = useWarehouse();
   const { data, loading, error } = useLookups(['contracts', 'sectors', 'service_fronts', 'fixed_assets']);
-  const [requester, setRequester] = useState<Employee | null>(null);
+  const [requester, setRequester] = useState<Employee | null>(request?.employee ?? null);
   const [f, setF] = useState({
     contract_id: '',
     sector_id: '',
@@ -42,13 +53,13 @@ export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) =
       .then((list) => {
         if (!alive) return;
         setTerminals(list);
-        setTerminalId(suggestTerminal(list));
+        setTerminalId(request ? request.terminal_user_id : suggestTerminal(list));
       })
       .catch(() => alive && setTerminals([]));
     return () => {
       alive = false;
     };
-  }, [current]);
+  }, [current, request]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -88,6 +99,13 @@ export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) =
         requester_employee_id: requester.id,
         terminal_user_id: terminalId || null,
       });
+      if (request) {
+        try {
+          await counterRequestAttach(request.id, r.id);
+        } catch (e) {
+          toast.warning(`Separação aberta, mas não foi ligada ao pedido do tablet: ${errorMessage(e)}`);
+        }
+      }
       onOpened(r.id);
     } catch (e) {
       setServerError(errorMessage(e));
@@ -102,6 +120,18 @@ export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) =
   return (
     <Card>
       <h2 className="text-lg font-semibold text-slate-900">Nova separação no balcão</h2>
+      {request && (
+        <div className="mt-2">
+          <Alert tone={request.employee ? 'success' : 'warning'} title={request.employee ? `Atendendo ${request.employee.full_name}, reconhecido pelo rosto` : 'Solicitante não reconhecido no tablet'}>
+            {request.employee
+              ? 'Preencha os dados da ME e abra a separação; ela aparece no tablet do solicitante. A confirmação no final é pelo rosto.'
+              : 'Identifique o solicitante pela matrícula. A confirmação no final será com foto e assinatura.'}
+            <button type="button" className="ml-2 font-semibold underline" onClick={onCancelRequest}>
+              Voltar
+            </button>
+          </Alert>
+        </div>
+      )}
       <p className="mb-5 text-sm text-slate-500">
         Identifique o solicitante e os dados da ME. Depois é só bipar os materiais com o leitor; o solicitante acompanha no tablet.
       </p>
@@ -123,7 +153,19 @@ export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) =
           ))}
         </Select>
         <div className="sm:col-span-2">
-          <EmployeePicker label="Solicitante (quem vai retirar)" value={requester} onChange={setRequester} />
+          {request?.employee ? (
+            <FixedField
+              label="Solicitante (quem vai retirar)"
+              value={
+                <span className="inline-flex items-center gap-2">
+                  <ScanFace className="h-4 w-4 text-emerald-600" /> {request.employee.full_name} · {request.employee.registration}
+                </span>
+              }
+              hint="Identificado pelo rosto no tablet."
+            />
+          ) : (
+            <EmployeePicker label="Solicitante (quem vai retirar)" value={requester} onChange={setRequester} />
+          )}
           {errors.requester && <p className="mt-1 text-sm text-red-600">{errors.requester}</p>}
         </div>
         {fixedContract ? (
@@ -200,6 +242,7 @@ export function CounterOpenForm({ onOpened }: { onOpened: (movementId: string) =
           label="Tablet do solicitante"
           value={terminalId}
           onChange={(e) => setTerminalId(e.target.value)}
+          disabled={Boolean(request)}
           inputSize="lg"
           wrapClassName="sm:col-span-2"
           hint={

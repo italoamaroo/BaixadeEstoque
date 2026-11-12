@@ -15,8 +15,7 @@ import {
   Trash2,
   Unlock,
   Wifi,
-  WifiOff,
-} from 'lucide-react';
+  WifiOff, ScanFace } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWarehouse } from '@/contexts/WarehouseContext';
@@ -50,6 +49,7 @@ import { StatusBadge } from '@/components/ui/Badge';
 import { Input, Checkbox } from '@/components/ui/Field';
 import { PageLoader, Spinner } from '@/components/ui/Spinner';
 import { CounterOpenForm } from './CounterOpenForm';
+import { counterRequestCancel, counterRequestsPending, type CounterRequest } from '@/lib/api';
 
 const ASK_QTY_KEY = 'baixas-estoque:balcao-perguntar-qtd';
 
@@ -70,11 +70,35 @@ export function CounterPage() {
 
 function CounterHome({ onOpened }: { onOpened: (id: string) => void }) {
   const [open, setOpen] = useState<Awaited<ReturnType<typeof counterMyOpen>> | null>(null);
+  const { current } = useWarehouse();
+  const [requests, setRequests] = useState<CounterRequest[]>([]);
+  const [attending, setAttending] = useState<CounterRequest | null>(null);
   useEffect(() => {
     counterMyOpen()
       .then(setOpen)
       .catch(() => setOpen([]));
   }, []);
+  // solicitantes que tocaram em "Retirar peças" no tablet deste estoque
+  const prevCount = useRef(0);
+  useEffect(() => {
+    if (!current) return;
+    let alive = true;
+    const load = () =>
+      counterRequestsPending(current.id)
+        .then((r) => {
+          if (!alive) return;
+          if (r.length > prevCount.current) playFeedback('info');
+          prevCount.current = r.length;
+          setRequests(r);
+        })
+        .catch(() => undefined);
+    void load();
+    const t = setInterval(load, 4000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [current]);
   return (
     <div>
       <PageHeader
@@ -104,7 +128,44 @@ function CounterHome({ onOpened }: { onOpened: (id: string) => void }) {
           </ul>
         </Card>
       )}
-      <CounterOpenForm onOpened={onOpened} />
+      {requests.length > 0 && !attending && (
+        <Card className="mb-4 ring-2 ring-emerald-400">
+          <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-emerald-800">
+            <ScanFace className="h-5 w-5" /> No balcão agora
+          </h2>
+          <ul className="divide-y divide-slate-100">
+            {requests.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <div>
+                  {r.employee ? (
+                    <>
+                      <p className="text-lg font-semibold text-slate-900">{r.employee.full_name}</p>
+                      <p className="text-sm text-slate-600">
+                        matrícula {r.employee.registration} · reconhecido pelo rosto
+                        {r.similarity != null ? ` (${Math.round(Number(r.similarity) * 100)}%)` : ''} · {r.terminal_name} · {fmtTime(r.created_at)}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-lg font-semibold text-amber-800">Solicitante não reconhecido</p>
+                      <p className="text-sm text-slate-600">
+                        Identifique pela matrícula · {r.reason ?? 'pediu atendimento'} · {r.terminal_name} · {fmtTime(r.created_at)}
+                      </p>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" onClick={() => void counterRequestCancel(r.id).then(() => setRequests((x) => x.filter((y) => y.id !== r.id)))}>
+                    Dispensar
+                  </Button>
+                  <Button onClick={() => setAttending(r)}>Atender</Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+      <CounterOpenForm key={attending?.id ?? 'novo'} request={attending} onCancelRequest={() => setAttending(null)} onOpened={onOpened} />
     </div>
   );
 }

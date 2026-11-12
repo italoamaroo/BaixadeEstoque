@@ -1,11 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
-import { CheckCircle2, ClipboardCheck, Link2, LogOut, PackageCheck, PenLine, ScanLine, ShieldCheck, Wifi, WifiOff, XCircle } from 'lucide-react';
+import { CheckCircle2, ClipboardCheck, Hand, Link2, LogOut, PackageCheck, PenLine, ScanFace, ScanLine, ShieldCheck, UserRound, Wifi, WifiOff, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCounterSession } from '@/hooks/useCounterSession';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
-import { counterConfirm, counterPair, counterRegisterAttempt, uploadPhoto, uploadSignature, type CounterSnapshot } from '@/lib/api';
+import {
+  counterConfirm,
+  counterPair,
+  counterRegisterAttempt,
+  counterRequestCancel,
+  counterRequestManual,
+  counterRequestStatus,
+  counterTerminalWarehouses,
+  faceConfirmationAvailable,
+  faceIdentify,
+  faceVerifyConfirmation,
+  getFaceConfig,
+  uploadPhoto,
+  uploadSignature,
+  type CounterSnapshot,
+} from '@/lib/api';
+import { FaceScanner } from '@/components/FaceScanner';
 import { PhotoCapture } from '@/components/PhotoCapture';
 import { activeConfirmationMethod, counterSignaturePath } from '@/lib/confirmation';
 import { errorMessage } from '@/lib/errors';
@@ -115,6 +131,7 @@ function Pairing({ onPaired, error }: { onPaired: () => void; error: string | nu
   };
   return (
     <div className="mx-auto mt-6 max-w-md space-y-5 text-center">
+      <RetirarPecas onAttended={onPaired} />
       <Link2 className="mx-auto h-14 w-14 text-brand-600" />
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Conectar a uma separação</h1>
@@ -138,6 +155,179 @@ function Pairing({ onPaired, error }: { onPaired: () => void; error: string | nu
         Conectar
       </Button>
       <p className="text-xs text-slate-500">Depois de conectado, as próximas separações deste balcão podem aparecer aqui automaticamente.</p>
+    </div>
+  );
+}
+
+const FAIL_TEXT: Record<string, string> = {
+  nao_reconhecido: 'Não reconheci o seu rosto.',
+  ambiguo: 'Não tive certeza de quem é. Vamos tentar de novo.',
+  sem_prova_de_vida: 'Não percebi o movimento do rosto. Vire o rosto devagar quando pedir.',
+};
+
+/** "Retirar peças": o solicitante se identifica pelo rosto e o almoxarife já vê quem é. */
+function RetirarPecas({ onAttended }: { onAttended: () => void }) {
+  const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
+  const [enabled, setEnabled] = useState(false);
+  const [whId, setWhId] = useState<string>('');
+  const [state, setState] = useState<
+    | { k: 'idle' }
+    | { k: 'scan' }
+    | { k: 'checking' }
+    | { k: 'fail'; reason: string; tries: number }
+    | { k: 'wait'; requestId: string; name: string | null }
+  >({ k: 'idle' });
+  const [tries, setTries] = useState(0);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    // relê a cada 30 s: o administrador pode ligar/desligar com o tablet aberto
+    const load = () => {
+      getFaceConfig()
+        .then((c) => setEnabled(Boolean(c?.enabled)))
+        .catch(() => undefined);
+      counterTerminalWarehouses()
+        .then((w) => w.length && setWarehouses(w))
+        .catch(() => undefined);
+    };
+    load();
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    if (!whId && warehouses.length) setWhId(warehouses[0].id);
+  }, [warehouses, whId]);
+
+  // aguardando o almoxarife: quando ele abrir a ME, a separação aparece sozinha neste tablet
+  const waitId = state.k === 'wait' ? state.requestId : null;
+  useEffect(() => {
+    if (!waitId) return;
+    const t = setInterval(async () => {
+      const st = await counterRequestStatus(waitId).catch(() => null);
+      if (!st) return;
+      if (st.status === 'atendido') {
+        clearInterval(t);
+        setState({ k: 'idle' });
+        setTries(0);
+        onAttended();
+      } else if (st.status === 'expirado' || st.status === 'cancelado') {
+        clearInterval(t);
+        setState({ k: 'idle' });
+        setErr(st.status === 'expirado' ? 'O pedido expirou. Toque em Retirar peças de novo.' : 'O pedido foi cancelado.');
+      }
+    }, 3000);
+    return () => clearInterval(t);
+  }, [waitId, onAttended]);
+
+  if (!enabled || !whId) return null;
+
+  const callStorekeeper = async (reason: string) => {
+    setErr(null);
+    try {
+      const id = await counterRequestManual(whId, reason);
+      playFeedback('info');
+      setState({ k: 'wait', requestId: id, name: null });
+    } catch (e) {
+      setErr(errorMessage(e));
+    }
+  };
+
+  if (state.k === 'wait') {
+    return (
+      <div className="space-y-3 rounded-2xl bg-emerald-50 p-6 ring-1 ring-emerald-200">
+        <UserRound className="mx-auto h-12 w-12 text-emerald-700" />
+        {state.name ? (
+          <p className="text-2xl font-bold text-emerald-900">Olá, {state.name.split(' ')[0]}!</p>
+        ) : (
+          <p className="text-2xl font-bold text-emerald-900">O almoxarife foi avisado</p>
+        )}
+        <p className="text-emerald-800">
+          {state.name ? 'O almoxarife já está vendo o seu pedido. Diga o que precisa e acompanhe os itens aqui.' : 'Ele vai te identificar pela matrícula. Aguarde no balcão.'}
+        </p>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            void counterRequestCancel(state.requestId).catch(() => undefined);
+            setState({ k: 'idle' });
+          }}
+        >
+          Cancelar pedido
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 border-b border-slate-200 pb-6">
+      {warehouses.length > 1 && (
+        <select className="rounded-lg border-slate-300 text-sm" value={whId} onChange={(e) => setWhId(e.target.value)} aria-label="Estoque">
+          {warehouses.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.name}
+            </option>
+          ))}
+        </select>
+      )}
+      {state.k === 'idle' && (
+        <Button size="xl" block variant="success" icon={<ScanFace className="h-8 w-8" />} className="py-10 text-2xl" onClick={() => (setErr(null), setState({ k: 'scan' }))}>
+          RETIRAR PEÇAS
+        </Button>
+      )}
+      {(state.k === 'scan' || state.k === 'checking') && (
+        <div className="space-y-3">
+          <FaceScanner
+            samplesNeeded={3}
+            timeoutMs={20000}
+            onUnavailable={(r) => setErr(`${r} Toque em “Chamar o almoxarife”.`)}
+            onResult={async (r) => {
+              setState({ k: 'checking' });
+              try {
+                const res = await faceIdentify(whId, r.descriptor, r.liveness);
+                if (res.ok) {
+                  playFeedback('ok');
+                  setState({ k: 'wait', requestId: res.request_id, name: res.employee.full_name });
+                } else {
+                  playFeedback('error');
+                  const n = tries + 1;
+                  setTries(n);
+                  setState({ k: 'fail', reason: res.reason, tries: n });
+                }
+              } catch (e) {
+                setErr(errorMessage(e));
+                setState({ k: 'idle' });
+              }
+            }}
+          />
+          {state.k === 'checking' && <p className="text-slate-600">Conferindo…</p>}
+          <div className="flex justify-center gap-2">
+            <Button variant="secondary" onClick={() => setState({ k: 'idle' })}>
+              Voltar
+            </Button>
+            <Button variant="secondary" icon={<Hand className="h-4 w-4" />} onClick={() => void callStorekeeper('Solicitante pediu atendimento sem o rosto')}>
+              Chamar o almoxarife
+            </Button>
+          </div>
+        </div>
+      )}
+      {state.k === 'fail' && (
+        <div className="space-y-3">
+          <Alert tone="warning" title={FAIL_TEXT[state.reason] ?? 'Não reconheci o seu rosto.'}>
+            {state.tries >= 3 ? 'Depois de 3 tentativas, chame o almoxarife: ele te identifica pela matrícula e você confirma com foto e assinatura.' : `Tentativa ${state.tries} de 3.`}
+          </Alert>
+          <div className="flex flex-wrap justify-center gap-2">
+            {state.tries < 3 && (
+              <Button icon={<ScanFace className="h-4 w-4" />} onClick={() => setState({ k: 'scan' })}>
+                Tentar de novo
+              </Button>
+            )}
+            <Button variant={state.tries >= 3 ? 'primary' : 'secondary'} icon={<Hand className="h-4 w-4" />} onClick={() => void callStorekeeper(`${state.tries} tentativa(s) sem reconhecer (${state.reason})`)}>
+              Chamar o almoxarife
+            </Button>
+          </div>
+        </div>
+      )}
+      {err && <Alert tone="error">{err}</Alert>}
+      <p className="text-sm text-slate-500">Ou, se o almoxarife já abriu a separação:</p>
     </div>
   );
 }
@@ -300,7 +490,9 @@ function ConfirmStep({ open, snapshot, onClose, onDone }: { open: boolean; snaps
   const { settings } = useAuth();
   const method = activeConfirmationMethod();
   const exporter = useRef<() => string | null>(() => null);
-  const [phase, setPhase] = useState<'foto' | 'assinatura'>('foto');
+  const [phase, setPhase] = useState<'carregando' | 'rosto' | 'foto' | 'assinatura'>('carregando');
+  const [faceRun, setFaceRun] = useState(0);
+  const [faceMsg, setFaceMsg] = useState<string | null>(null);
   const [photo, setPhoto] = useState<Blob | null>(null);
   const [noCamera, setNoCamera] = useState<string | null>(null);
   const [empty, setEmpty] = useState(true);
@@ -312,11 +504,48 @@ function ConfirmStep({ open, snapshot, onClose, onDone }: { open: boolean; snaps
     if (open) {
       setErr(null);
       setEmpty(true);
-      setPhase('foto');
+      setPhase('carregando');
+      setFaceMsg(null);
       setPhoto(null);
       setNoCamera(null);
+      // com rosto cadastrado e reconhecimento ligado, confirma pelo rosto (sem assinatura e sem foto)
+      faceConfirmationAvailable(m.id)
+        .then((a) => setPhase(a.available ? 'rosto' : 'foto'))
+        .catch(() => setPhase('foto'));
     }
-  }, [open]);
+  }, [open, m.id]);
+
+  const confirmByFace = async (descriptor: number[], liveness: boolean) => {
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    setFaceMsg(null);
+    try {
+      const v = await faceVerifyConfirmation(m.id, descriptor, liveness);
+      if (!v.ok) {
+        playFeedback('error');
+        if (v.remaining <= 0) {
+          setFaceMsg('Não foi possível confirmar pelo rosto. Confirme com foto e assinatura.');
+          setPhase('foto');
+        } else {
+          setFaceMsg(
+            `${v.reason === 'sem_prova_de_vida' ? 'Não percebi o movimento do rosto.' : 'O rosto não conferiu com o solicitante desta ME.'} Restam ${v.remaining} tentativa(s).`,
+          );
+        }
+        return;
+      }
+      await counterConfirm(m.id, { method: 'facial', verification_id: v.verification_id });
+      playFeedback('ok');
+      toast.success('ME confirmada pelo rosto.');
+      onClose();
+      onDone();
+    } catch (e) {
+      playFeedback('error');
+      setErr(`${errorMessage(e)} A ME continua aguardando confirmação.`);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const cancel = () => {
     if (busy) return;
@@ -367,10 +596,25 @@ function ConfirmStep({ open, snapshot, onClose, onDone }: { open: boolean; snaps
       onClose={cancel}
       busy={busy}
       size="lg"
-      title={phase === 'foto' ? '1 de 2 · Foto do solicitante' : '2 de 2 · Assine para confirmar a retirada'}
+      title={
+        phase === 'rosto' || phase === 'carregando'
+          ? 'Confirme a retirada com o seu rosto'
+          : phase === 'foto'
+            ? '1 de 2 · Foto do solicitante'
+            : '2 de 2 · Assine para confirmar a retirada'
+      }
       description={`${m.me_number} · ${m.requester_name} (${m.requester_registration}) · ${fmtDateTime(new Date())}`}
       footer={
-        phase === 'foto' ? (
+        phase === 'rosto' || phase === 'carregando' ? (
+          <>
+            <Button variant="secondary" icon={<XCircle className="h-4 w-4" />} onClick={cancel}>
+              Cancelar
+            </Button>
+            <Button variant="secondary" icon={<PenLine className="h-4 w-4" />} disabled={busy} onClick={() => setPhase('foto')}>
+              Confirmar com foto e assinatura
+            </Button>
+          </>
+        ) : phase === 'foto' ? (
           <>
             <Button variant="secondary" icon={<XCircle className="h-4 w-4" />} onClick={cancel}>
               Cancelar
@@ -397,8 +641,29 @@ function ConfirmStep({ open, snapshot, onClose, onDone }: { open: boolean; snaps
         )
       }
     >
-      {phase === 'foto' ? (
+      {phase === 'carregando' ? (
+        <p className="py-10 text-center text-slate-500">Preparando…</p>
+      ) : phase === 'rosto' ? (
+        <div className="space-y-3">
+          <p className="text-center text-sm text-slate-600">Olhe para a câmera e, quando pedir, vire o rosto devagar. Nenhuma foto é guardada.</p>
+          <FaceScanner key={faceRun} samplesNeeded={2} timeoutMs={20000} onResult={(r) => void confirmByFace(r.descriptor, r.liveness)} onUnavailable={() => setPhase('foto')} />
+          {busy && <p className="text-center text-slate-600">Conferindo…</p>}
+          {faceMsg && (
+            <div className="space-y-2 text-center">
+              <Alert tone="warning">{faceMsg}</Alert>
+              <Button icon={<ScanFace className="h-4 w-4" />} onClick={() => (setFaceMsg(null), setFaceRun((n) => n + 1))}>
+                Tentar de novo
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : phase === 'foto' ? (
         <div>
+          {faceMsg && (
+            <div className="mb-3">
+              <Alert tone="warning">{faceMsg}</Alert>
+            </div>
+          )}
           <p className="mb-3 text-sm text-slate-600">
             Posicione o rosto no centro e toque em <strong>Tirar foto</strong>. A foto fica registrada na ME como comprovante da retirada e só a
             gestão tem acesso.
