@@ -31,7 +31,7 @@ export const CONFIRMATION_METHODS: ConfirmationMethodInfo[] = [
     id: 'facial',
     label: 'Reconhecimento facial',
     available: false,
-    description: 'Aguardando a definição do fornecedor (com prova de vida).',
+    description: 'Reconhecimento no próprio tablet, com prova de vida (virar o rosto).',
   },
 ];
 

@@ -990,3 +990,75 @@ export const respondDsr = (id: number, outcome: 'atendido' | 'atendido_parcialme
 export const addDsrNote = (id: number, body: string) => rpc<void>('dsr_add_note', { p_id: id, p_body: body });
 export const getDsrEmployeeReport = (employeeId: string, requestId: number | null) =>
   rpc<DsrEmployeeReport>('dsr_employee_report', { p_employee_id: employeeId, p_request_id: requestId });
+
+// ---------------------------------------------------------------------------
+// Reconhecimento facial (o rosto é lido no aparelho; só a impressão numérica vem para cá)
+// ---------------------------------------------------------------------------
+export interface FaceConfig {
+  enabled: boolean;
+  threshold: number;
+  margin: number;
+}
+export interface FaceOverview {
+  settings: FaceConfig;
+  ativos: number;
+  com_rosto: number;
+  faces: { employee_id: string; registration: string; full_name: string; modelos: number; origem: string; cadastrado_em: string }[];
+}
+export interface FaceBulkResult {
+  cadastrados: number;
+  modelos: number;
+  nao_encontrados: string[];
+  inativos: string[];
+  invalidos: string[];
+}
+export interface CounterRequest {
+  id: string;
+  method: 'facial' | 'manual';
+  similarity: number | null;
+  reason: string | null;
+  created_at: string;
+  terminal_user_id: string;
+  terminal_name: string;
+  employee: Employee | null;
+}
+
+export const getFaceConfig = () => rpc<FaceConfig | null>('face_config');
+export const updateFaceSettings = (p: Partial<FaceConfig>) => rpc<FaceConfig>('face_settings_update', { p });
+export const getFaceOverview = () => rpc<FaceOverview>('face_overview');
+export const faceEnroll = (employeeId: string, descriptors: number[][], source: 'camera' | 'importacao' = 'camera') =>
+  rpc<{ employee_id: string; modelos: number }>('face_enroll', { p_employee_id: employeeId, p_descriptors: descriptors, p_source: source });
+export const faceEnrollBulk = (items: { registration: string; descriptors: number[][] }[]) =>
+  rpc<FaceBulkResult>('face_enroll_bulk', { p_items: items });
+export const faceRemove = (employeeId: string) => rpc<number>('face_remove', { p_employee_id: employeeId });
+export const faceIdentify = (warehouseId: string, descriptor: number[], liveness: boolean) =>
+  rpc<
+    | { ok: true; request_id: string; similarity: number; employee: { full_name: string; registration: string } }
+    | { ok: false; reason: 'nao_reconhecido' | 'ambiguo' | 'sem_prova_de_vida' }
+  >('face_identify', { p_warehouse_id: warehouseId, p_descriptor: descriptor, p_liveness: liveness });
+export const counterRequestManual = (warehouseId: string, reason: string) =>
+  rpc<string>('counter_request_manual', { p_warehouse_id: warehouseId, p_reason: reason });
+export const counterRequestCancel = (id: string) => rpc<void>('counter_request_cancel', { p_id: id });
+export const counterRequestStatus = (id: string) =>
+  rpc<{ status: 'pendente' | 'atendido' | 'cancelado' | 'expirado'; movement_id: string | null } | null>('counter_request_status', { p_id: id });
+export const counterRequestsPending = (warehouseId: string) => rpc<CounterRequest[]>('counter_requests_pending', { p_warehouse_id: warehouseId });
+export const counterRequestAttach = (requestId: string, movementId: string) =>
+  rpc<void>('counter_request_attach', { p_request_id: requestId, p_movement_id: movementId });
+export const faceConfirmationAvailable = (movementId: string) =>
+  rpc<{ available: boolean; reason?: 'desligado' | 'sem_cadastro' | 'muitas_falhas'; tentativas_restantes?: number }>('face_confirmation_available', {
+    p_movement_id: movementId,
+  });
+export const faceVerifyConfirmation = (movementId: string, descriptor: number[], liveness: boolean) =>
+  rpc<{ ok: true; verification_id: string; similarity: number } | { ok: false; reason: 'nao_reconhecido' | 'sem_prova_de_vida'; remaining: number }>(
+    'face_verify_confirmation',
+    { p_movement_id: movementId, p_descriptor: descriptor, p_liveness: liveness },
+  );
+export const movementIdentification = (movementId: string) =>
+  rpc<{
+    identificado_por: 'facial' | 'manual' | null;
+    confirmado_por: 'assinatura' | 'facial' | null;
+    confirmado_em: string | null;
+    semelhanca_inicio: number | null;
+    semelhanca_confirmacao: number | null;
+  } | null>('movement_identification', { p_movement_id: movementId });
+export const counterTerminalWarehouses = () => rpc<{ id: string; name: string }[]>('counter_terminal_warehouses');
