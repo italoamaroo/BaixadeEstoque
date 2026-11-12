@@ -9,7 +9,8 @@ function assetList(): Plugin {
     name: 'asset-list',
     apply: 'build',
     generateBundle(_opts, bundle) {
-      const files = Object.keys(bundle).filter((f) => !f.endsWith('.map'));
+      // o reconhecimento facial (1,3 MB) só funciona online: não é guardado no aparelho para uso offline
+      const files = Object.keys(bundle).filter((f) => !f.endsWith('.map') && !/face-api/.test(f));
       this.emitFile({ type: 'asset', fileName: 'asset-list.json', source: JSON.stringify({ build: Date.now(), files }) });
     },
   };
