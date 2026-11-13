@@ -114,6 +114,23 @@ function cleanRows(rows: unknown[][]): never[] {
 }
 
 /** Gera o PDF: uma seção por ME com cabeçalho, itens e assinatura de quem recebeu. */
+/** Logo do consórcio (public/logo-consorcio.png) como data URL; sem logo, o relatório sai sem ela. */
+async function loadLogo(): Promise<string | null> {
+  try {
+    const r = await fetch(`${import.meta.env.BASE_URL ?? '/'}logo-consorcio.png`.replace('//', '/'));
+    if (!r.ok || !(r.headers.get('content-type') ?? '').includes('image')) return null;
+    const b = await r.blob();
+    return await new Promise((res) => {
+      const fr = new FileReader();
+      fr.onload = () => res(typeof fr.result === 'string' ? fr.result : null);
+      fr.onerror = () => res(null);
+      fr.readAsDataURL(b);
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function buildMovementsPdf(
   data: PdfMovement[],
   opts: { filterLines: string[]; generatedBy: string; companyName: string; total: number; truncated: boolean },
@@ -137,6 +154,13 @@ export async function buildMovementsPdf(
   doc.setFontSize(10);
   doc.text(`${opts.companyName} · MEs com itens e assinatura de recebimento`, M, 21);
   doc.setTextColor(30, 41, 59);
+  // logo do consórcio no canto direito da faixa
+  const logo = await loadLogo();
+  if (logo) {
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(W - M - 44, 3, 44, 22, 2, 2, 'F');
+    doc.addImage(logo, 'PNG', W - M - 42, 4.6, 40, 19.2);
+  }
 
   let y = 38;
   doc.setFontSize(10);
