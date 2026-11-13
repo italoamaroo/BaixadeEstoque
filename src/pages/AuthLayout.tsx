@@ -15,6 +15,7 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
           </div>
         </div>
         <div className="rounded-2xl bg-white p-6 shadow-xl">
+          <img src="/logo-consorcio.png" alt="Consórcio Recife Ambiental" className="mx-auto mb-5 h-16 w-auto" />
           <h1 className="text-xl font-bold text-slate-900">{title}</h1>
           {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
           <div className="mt-6">{children}</div>
