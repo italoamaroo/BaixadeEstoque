@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { Camera, RotateCcw, ScanFace } from 'lucide-react';
-import { averageDescriptor, FRONTAL_YAW, LIVENESS_YAW_RANGE, loadFaceApi, readFace, type Descriptor } from '@/lib/face';
+import { averageDescriptor, describeFace, detectFace, FRONTAL_YAW, LIVENESS_YAW_RANGE, prepareFace, type Descriptor } from '@/lib/face';
 import { Button } from '@/components/ui/Button';
 
 export interface FaceScanResult {
@@ -13,17 +13,42 @@ export interface FaceScanResult {
   liveness: boolean;
 }
 
+/** Leituras de frente que concordam entre si (descarta quadros borrados ou distorcidos). */
+const MAX_SPREAD = 0.35;
+const dist = (a: Descriptor, b: Descriptor) => {
+  let d = 0;
+  for (let k = 0; k < 128; k++) d += (a[k] - b[k]) ** 2;
+  return Math.sqrt(d);
+};
+/** Escolhe `needed` leituras que concordam todas entre si, ou null se ainda não há. */
+function pickConsistent(list: Descriptor[], needed: number): Descriptor[] | null {
+  if (list.length < needed) return null;
+  for (let i = list.length - 1; i >= 0; i--) {
+    const near = list
+      .map((d, j) => ({ d, j, x: dist(list[i], d) }))
+      .filter((o) => o.x <= MAX_SPREAD)
+      .sort((a, b) => a.x - b.x)
+      .slice(0, needed);
+    if (near.length < needed) continue;
+    const ok = near.every((a, ai) => near.every((b, bi) => bi <= ai || dist(a.d, b.d) <= MAX_SPREAD));
+    if (ok) return near.map((o) => o.d);
+  }
+  return null;
+}
+const consistent = (list: Descriptor[], needed: number) => pickConsistent(list, needed) !== null;
+
 type Phase = 'carregando' | 'frente' | 'virar' | 'pronto' | 'erro' | 'tempo';
+type Box = { left: number; top: number; size: number };
 
 /**
  * Câmera ao vivo que lê o rosto no próprio aparelho.
- * 1) olhar de frente (coleta leituras); 2) virar o rosto devagar (prova de vida).
- * Nada é gravado: só a impressão numérica vai para quem chamou.
+ * Olhar de frente (gera a impressão numérica) e virar o rosto devagar (prova de vida), em qualquer ordem.
+ * Um círculo acompanha o rosto na tela. Nada é gravado: só a impressão numérica vai para quem chamou.
  */
 export function FaceScanner({
-  samplesNeeded = 3,
+  samplesNeeded = 2,
   requireLiveness = true,
-  timeoutMs = 25000,
+  timeoutMs = 20000,
   onResult,
   onUnavailable,
   className,
@@ -39,6 +64,7 @@ export function FaceScanner({
   const [phase, setPhase] = useState<Phase>('carregando');
   const [hint, setHint] = useState('Preparando a câmera…');
   const [progress, setProgress] = useState(0);
+  const [box, setBox] = useState<Box | null>(null);
   const [run, setRun] = useState(0);
   const done = useRef(onResult);
   done.current = onResult;
@@ -53,6 +79,7 @@ export function FaceScanner({
     let maxYaw = -Infinity;
     setPhase('carregando');
     setProgress(0);
+    setBox(null);
     setHint('Preparando a câmera…');
 
     const stop = () => {
@@ -65,7 +92,7 @@ export function FaceScanner({
         if (!navigator.mediaDevices?.getUserMedia) throw new Error('Este aparelho não permite usar a câmera aqui.');
         const [s] = await Promise.all([
           navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false }),
-          loadFaceApi(),
+          prepareFace(),
         ]);
         stream = s;
         if (!alive) return stop();
@@ -73,43 +100,62 @@ export function FaceScanner({
         v.srcObject = s;
         await v.play().catch(() => undefined);
         setPhase('frente');
-        setHint('Olhe para a câmera, de frente');
+        setHint('Olhe para a câmera');
         const started = Date.now();
         while (alive) {
           if (Date.now() - started > timeoutMs) {
             setPhase('tempo');
+            setBox(null);
             setHint('Não consegui ler o rosto a tempo.');
             stream.getTracks().forEach((t) => t.stop());
             return;
           }
-          const r = v.readyState >= 2 ? await readFace(v).catch(() => null) : null;
+          const r = v.readyState >= 2 ? await detectFace(v).catch(() => null) : null;
           if (!alive) return;
           if (!r) {
-            setHint(samples.length < samplesNeeded ? 'Centralize o rosto na tela, com boa luz' : 'Vire o rosto devagar para um lado e volte');
+            setBox(null);
+            setHint('Centralize o rosto na tela, com boa luz');
           } else {
+            // círculo que acompanha o rosto (a imagem aparece espelhada)
+            const size = Math.max(r.box.width, r.box.height * 0.75) * 1.35;
+            const cx = 1 - (r.box.x + r.box.width / 2);
+            const cy = r.box.y + r.box.height / 2;
+            setBox({ left: cx - size / 2, top: cy - (size * 4) / 3 / 2, size });
             minYaw = Math.min(minYaw, r.yaw);
             maxYaw = Math.max(maxYaw, r.yaw);
-            if (samples.length < samplesNeeded) {
-              if (Math.abs(r.yaw) <= FRONTAL_YAW && r.score >= 0.6) samples.push(r.descriptor);
-              setHint('Olhe para a câmera, de frente');
+            const front = consistent(samples, samplesNeeded);
+            if (!front && Math.abs(r.yaw) <= FRONTAL_YAW && r.score >= 0.6) {
+              // a parte pesada só nos quadros de frente, e só até ter leituras que concordam
+              const d = await describeFace(v, r).catch(() => null);
+              if (!alive) return;
+              if (d) {
+                samples.push(d);
+                if (samples.length > 8) samples.shift();
+              }
             }
+            const ok = consistent(samples, samplesNeeded);
             const live = maxYaw - minYaw >= LIVENESS_YAW_RANGE;
-            const pFront = Math.min(1, samples.length / samplesNeeded);
+            const pFront = ok ? 1 : Math.min(0.9, samples.length / samplesNeeded);
             const pLive = requireLiveness ? Math.min(1, Math.max(0, maxYaw - minYaw) / LIVENESS_YAW_RANGE) : 1;
             setProgress(Math.round(((pFront + pLive) / 2) * 100));
-            if (samples.length >= samplesNeeded) {
-              if (!requireLiveness || live) {
-                setPhase('pronto');
-                setHint('Pronto!');
-                stream.getTracks().forEach((t) => t.stop());
-                done.current({ descriptor: averageDescriptor(samples), samples: [...samples], liveness: live });
-                return;
-              }
+            if (ok && (!requireLiveness || live)) {
+              setPhase('pronto');
+              setHint('Pronto!');
+              stream.getTracks().forEach((t) => t.stop());
+              const chosen = pickConsistent(samples, samplesNeeded) ?? samples;
+              done.current({ descriptor: averageDescriptor(chosen), samples: chosen.slice(0, 5), liveness: live });
+              return;
+            }
+            if (ok) {
               setPhase('virar');
-              setHint('Agora vire o rosto devagar para um lado e volte');
+              setHint('Agora vire o rosto devagar para um lado');
+            } else {
+              setPhase('frente');
+              setHint(Math.abs(r.yaw) > FRONTAL_YAW ? 'Agora olhe de frente para a câmera' : 'Olhe para a câmera');
             }
           }
-          await new Promise((res) => setTimeout(res, 120));
+          // libera a tela entre uma leitura e outra (o vídeo continua fluido)
+          await new Promise((res) => requestAnimationFrame(() => res(null)));
         }
       } catch (e) {
         if (!alive) return;
@@ -129,16 +175,22 @@ export function FaceScanner({
     return stop;
   }, [run, samplesNeeded, requireLiveness, timeoutMs]);
 
+  const ring = phase === 'pronto' ? 'border-emerald-400' : phase === 'virar' ? 'border-amber-300' : 'border-sky-300';
   return (
     <div className={clsx('space-y-3', className)}>
       <div className="relative mx-auto aspect-[4/3] w-full max-w-md overflow-hidden rounded-2xl bg-slate-900">
         <video ref={video} playsInline muted className="h-full w-full -scale-x-100 object-cover" />
-        <div
-          className={clsx(
-            'pointer-events-none absolute inset-[12%] rounded-[45%] border-4 transition-colors',
-            phase === 'pronto' ? 'border-emerald-400' : phase === 'virar' ? 'border-amber-300' : 'border-white/70',
-          )}
-        />
+        {box ? (
+          <div
+            className={clsx('pointer-events-none absolute rounded-full border-4 transition-all duration-150 ease-out', ring)}
+            style={{ left: `${box.left * 100}%`, top: `${box.top * 100}%`, width: `${box.size * 100}%`, aspectRatio: '1 / 1' }}
+            data-testid="face-ring"
+          />
+        ) : (
+          phase !== 'carregando' && (
+            <div className="pointer-events-none absolute left-1/2 top-1/2 aspect-square h-[70%] -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-dashed border-white/60" />
+          )
+        )}
         {phase === 'carregando' && (
           <div className="absolute inset-0 grid place-items-center text-white">
             <ScanFace className="h-12 w-12 animate-pulse" />
