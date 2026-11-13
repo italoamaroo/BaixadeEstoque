@@ -24,6 +24,7 @@ export function MovementPrint({ detail, signatureUrl, companyName }: Props) {
         <tbody>
           <tr>
             <td className={`${cell} w-[28%]`}>
+              <img src="/logo-consorcio.png" alt={companyName} className="mb-1 h-11 w-auto" />
               <span className="text-sm font-bold">{companyName}</span>
               <span className="block text-[10px]">Almoxarifado {m.warehouse_name}</span>
             </td>
