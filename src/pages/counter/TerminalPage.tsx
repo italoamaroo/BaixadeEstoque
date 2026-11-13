@@ -22,6 +22,7 @@ import {
   type CounterSnapshot,
 } from '@/lib/api';
 import { FaceScanner } from '@/components/FaceScanner';
+import { prepareFace } from '@/lib/face';
 import { PhotoCapture } from '@/components/PhotoCapture';
 import { activeConfirmationMethod, counterSignaturePath } from '@/lib/confirmation';
 import { errorMessage } from '@/lib/errors';
@@ -184,7 +185,11 @@ function RetirarPecas({ onAttended }: { onAttended: () => void }) {
     // relê a cada 30 s: o administrador pode ligar/desligar com o tablet aberto
     const load = () => {
       getFaceConfig()
-        .then((c) => setEnabled(Boolean(c?.enabled)))
+        .then((c) => {
+          setEnabled(Boolean(c?.enabled));
+          // deixa o reconhecimento pronto antes de alguém tocar no botão (a 1ª leitura é a mais lenta)
+          if (c?.enabled) void prepareFace().catch(() => undefined);
+        })
         .catch(() => undefined);
       counterTerminalWarehouses()
         .then((w) => w.length && setWarehouses(w))
@@ -276,7 +281,7 @@ function RetirarPecas({ onAttended }: { onAttended: () => void }) {
       {(state.k === 'scan' || state.k === 'checking') && (
         <div className="space-y-3">
           <FaceScanner
-            samplesNeeded={3}
+            samplesNeeded={2}
             timeoutMs={20000}
             onUnavailable={(r) => setErr(`${r} Toque em “Chamar o almoxarife”.`)}
             onResult={async (r) => {

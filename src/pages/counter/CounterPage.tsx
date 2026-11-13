@@ -73,6 +73,7 @@ function CounterHome({ onOpened }: { onOpened: (id: string) => void }) {
   const { current } = useWarehouse();
   const [requests, setRequests] = useState<CounterRequest[]>([]);
   const [attending, setAttending] = useState<CounterRequest | null>(null);
+  const skipAuto = useRef(new Set<string>());
   useEffect(() => {
     counterMyOpen()
       .then(setOpen)
@@ -99,6 +100,14 @@ function CounterHome({ onOpened }: { onOpened: (id: string) => void }) {
       clearInterval(t);
     };
   }, [current]);
+  // reconhecido pelo rosto: o formulário já vem preenchido com o solicitante (sem precisar clicar em Atender)
+  useEffect(() => {
+    if (attending && !requests.some((r) => r.id === attending.id)) setAttending(null);
+    else if (!attending) {
+      const facial = requests.find((r) => r.employee && !skipAuto.current.has(r.id));
+      if (facial) setAttending(facial);
+    }
+  }, [requests, attending]);
   return (
     <div>
       <PageHeader
@@ -128,7 +137,7 @@ function CounterHome({ onOpened }: { onOpened: (id: string) => void }) {
           </ul>
         </Card>
       )}
-      {requests.length > 0 && !attending && (
+      {requests.length > 0 && (
         <Card className="mb-4 ring-2 ring-emerald-400">
           <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-emerald-800">
             <ScanFace className="h-5 w-5" /> No balcão agora
@@ -158,14 +167,21 @@ function CounterHome({ onOpened }: { onOpened: (id: string) => void }) {
                   <Button variant="ghost" onClick={() => void counterRequestCancel(r.id).then(() => setRequests((x) => x.filter((y) => y.id !== r.id)))}>
                     Dispensar
                   </Button>
-                  <Button onClick={() => setAttending(r)}>Atender</Button>
+                  {attending?.id === r.id ? (
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-800">Atendendo · preencha abaixo</span>
+                  ) : (
+                    <Button onClick={() => setAttending(r)}>Atender</Button>
+                  )}
                 </div>
               </li>
             ))}
           </ul>
         </Card>
       )}
-      <CounterOpenForm key={attending?.id ?? 'novo'} request={attending} onCancelRequest={() => setAttending(null)} onOpened={onOpened} />
+      <CounterOpenForm key={attending?.id ?? 'novo'} request={attending} onCancelRequest={() => {
+          if (attending) skipAuto.current.add(attending.id);
+          setAttending(null);
+        }} onOpened={onOpened} />
     </div>
   );
 }
