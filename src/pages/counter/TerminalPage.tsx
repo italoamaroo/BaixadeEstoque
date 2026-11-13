@@ -43,18 +43,21 @@ export function TerminalPage() {
   const { userId, displayName, signOut } = useAuth();
   const online = useOnlineStatus();
   const { snapshot, loading, error, live, refresh } = useCounterSession({ mode: 'terminal', userId });
-  // depois de confirmada/cancelada, a ME some do tablet após 20 s (ou ao tocar em "Conectar a outra separação")
+  // depois de confirmada, a ME some do tablet em 5 s (cancelada: 10 s) e volta para "Retirar peças".
+  // O tempo conta pelo relógio do próprio tablet (não depende do horário do servidor).
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [switching, setSwitching] = useState(false);
   const [, tick] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => tick((n) => n + 1), 5000);
+    const t = setInterval(() => tick((n) => n + 1), 1000);
     return () => clearInterval(t);
   }, []);
   const ended = snapshot && (snapshot.session.status === 'confirmada' || snapshot.session.status === 'cancelada');
-  const hide =
-    !snapshot ||
-    (ended && (dismissed === snapshot.session.id || Date.now() - new Date(snapshot.session.last_event_at).getTime() > 20000));
+  const endedAt = useRef<{ id: string; at: number } | null>(null);
+  if (ended && endedAt.current?.id !== snapshot.session.id) endedAt.current = { id: snapshot.session.id, at: Date.now() };
+  const holdMs = snapshot?.session.status === 'cancelada' ? 10000 : 5000;
+  const leftMs = ended && endedAt.current ? holdMs - (Date.now() - endedAt.current.at) : null;
+  const hide = !snapshot || (ended && (dismissed === snapshot.session.id || (leftMs !== null && leftMs <= 0)));
 
   // som quando a separação termina ou um item entra
   const prev = useRef<{ status?: string; items?: number }>({});
@@ -100,7 +103,12 @@ export function TerminalPage() {
             error={error}
           />
         ) : (
-          <Session snapshot={snapshot} onChanged={() => void refresh()} onDismiss={() => setDismissed(snapshot.session.id)} />
+          <Session
+            snapshot={snapshot}
+            onChanged={() => void refresh()}
+            onDismiss={() => setDismissed(snapshot.session.id)}
+            secondsLeft={leftMs !== null ? Math.max(1, Math.ceil(leftMs / 1000)) : null}
+          />
         )}
       </main>
     </div>
@@ -205,6 +213,9 @@ function RetirarPecas({ onAttended }: { onAttended: () => void }) {
 
   // aguardando o almoxarife: quando ele abrir a ME, a separação aparece sozinha neste tablet
   const waitId = state.k === 'wait' ? state.requestId : null;
+  // a tela pai redesenha a cada segundo: guarda a função para não reiniciar a consulta
+  const attendedRef = useRef(onAttended);
+  attendedRef.current = onAttended;
   useEffect(() => {
     if (!waitId) return;
     const t = setInterval(async () => {
@@ -214,7 +225,7 @@ function RetirarPecas({ onAttended }: { onAttended: () => void }) {
         clearInterval(t);
         setState({ k: 'idle' });
         setTries(0);
-        onAttended();
+        attendedRef.current();
       } else if (st.status === 'expirado' || st.status === 'cancelado') {
         clearInterval(t);
         setState({ k: 'idle' });
@@ -222,7 +233,7 @@ function RetirarPecas({ onAttended }: { onAttended: () => void }) {
       }
     }, 3000);
     return () => clearInterval(t);
-  }, [waitId, onAttended]);
+  }, [waitId]);
 
   if (!enabled || !whId) return null;
 
@@ -337,7 +348,17 @@ function RetirarPecas({ onAttended }: { onAttended: () => void }) {
   );
 }
 
-function Session({ snapshot, onChanged, onDismiss }: { snapshot: CounterSnapshot; onChanged: () => void; onDismiss: () => void }) {
+function Session({
+  snapshot,
+  onChanged,
+  onDismiss,
+  secondsLeft = null,
+}: {
+  snapshot: CounterSnapshot;
+  onChanged: () => void;
+  onDismiss: () => void;
+  secondsLeft?: number | null;
+}) {
   const m = snapshot.movement;
   const s = snapshot.session;
   const items = snapshot.items;
@@ -378,8 +399,8 @@ function Session({ snapshot, onChanged, onDismiss }: { snapshot: CounterSnapshot
           <CheckCircle2 className="mx-auto h-14 w-14" />
           <p className="mt-2 text-2xl font-bold">ME confirmada</p>
           <p className="text-emerald-100">Confirmada em {fmtDateTime(m.confirmed_at)}. Obrigado!</p>
-          <button type="button" onClick={onDismiss} className="mt-3 text-sm font-semibold text-white underline">
-            Conectar a outra separação
+          <button type="button" onClick={onDismiss} className="mt-4 rounded-xl bg-white px-6 py-3 text-lg font-bold text-emerald-700 shadow">
+            Próximo solicitante{secondsLeft ? ` (${secondsLeft} s)` : ''}
           </button>
         </div>
       )}
