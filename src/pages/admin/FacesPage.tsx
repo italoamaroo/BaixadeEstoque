@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { faceEnroll, faceEnrollBulk, faceRemove, getFaceOverview, updateFaceSettings, withRetry, type FaceBulkResult, type FaceOverview } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
 import { groupPhotosByCpf, maskCpf, readCpfSheet } from '@/lib/faceImport';
-import { loadFaceApi, readFaceFromFile } from '@/lib/face';
+import { loadFaceApi, prepareFace, readFaceFromFile } from '@/lib/face';
 import { fmtDateTime, fmtInt } from '@/lib/format';
 import type { Employee } from '@/types/db';
 
@@ -410,6 +410,7 @@ function CameraEnroll({ open, onClose, onDone }: { open: boolean; onClose: () =>
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     if (open) {
+      void prepareFace().catch(() => undefined);
       setEmp(null);
       setScanning(false);
       setErr(null);
@@ -426,7 +427,7 @@ function CameraEnroll({ open, onClose, onDone }: { open: boolean; onClose: () =>
         )}
         {emp && scanning && (
           <FaceScanner
-            samplesNeeded={4}
+            samplesNeeded={3}
             onResult={async (r) => {
               setBusy(true);
               setErr(null);
