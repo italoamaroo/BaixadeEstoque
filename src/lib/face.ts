@@ -76,6 +76,71 @@ export async function readFace(input: HTMLImageElement | HTMLVideoElement | HTML
   };
 }
 
+/** Tamanho da imagem usada para achar o rosto ao vivo (menor = mais rápido). */
+export const LIVE_INPUT_SIZE = 224;
+
+export interface LiveDetection {
+  yaw: number;
+  score: number;
+  /** caixa do rosto em fração da imagem (0 a 1), para desenhar o círculo que acompanha o rosto */
+  box: { x: number; y: number; width: number; height: number };
+  /** uso interno: região alinhada do rosto para gerar a impressão numérica */
+  aligned: unknown;
+}
+
+/** Só acha o rosto e os pontos (rápido). A impressão numérica é gerada à parte, só quando precisa. */
+export async function detectFace(input: HTMLVideoElement | HTMLCanvasElement): Promise<LiveDetection | null> {
+  const faceapi = await loadFaceApi();
+  const r = await faceapi.detectSingleFace(input, new faceapi.TinyFaceDetectorOptions({ inputSize: LIVE_INPUT_SIZE, scoreThreshold: 0.5 })).withFaceLandmarks(true);
+  if (!r) return null;
+  const W = input instanceof HTMLVideoElement ? input.videoWidth : input.width;
+  const H = input instanceof HTMLVideoElement ? input.videoHeight : input.height;
+  const b = r.detection.box;
+  return {
+    yaw: estimateYaw(r.landmarks.positions),
+    score: r.detection.score,
+    box: { x: b.x / (W || 1), y: b.y / (H || 1), width: b.width / (W || 1), height: b.height / (H || 1) },
+    aligned: r.alignedRect,
+  };
+}
+
+/** Gera a impressão numérica do rosto já encontrado (a parte mais pesada; feita poucas vezes). */
+export async function describeFace(input: HTMLVideoElement | HTMLCanvasElement, d: LiveDetection): Promise<Descriptor | null> {
+  const faceapi = await loadFaceApi();
+  const [face] = await faceapi.extractFaces(input, [d.aligned as Parameters<typeof faceapi.extractFaces>[1][number]]);
+  if (!face) return null;
+  const desc = (await faceapi.computeFaceDescriptor(face)) as Float32Array;
+  return round(desc);
+}
+
+let warming: Promise<void> | null = null;
+/**
+ * Prepara o reconhecimento antes de a pessoa tocar no botão: baixa os modelos e faz uma leitura
+ * de aquecimento (a primeira leitura é a mais lenta, porque prepara a placa de vídeo).
+ */
+export function prepareFace(): Promise<void> {
+  if (!warming) {
+    warming = (async () => {
+      const faceapi = await loadFaceApi();
+      const c = document.createElement('canvas');
+      c.width = 320;
+      c.height = 240;
+      const g = c.getContext('2d')!;
+      g.fillStyle = '#888';
+      g.fillRect(0, 0, c.width, c.height);
+      await faceapi.detectSingleFace(c, new faceapi.TinyFaceDetectorOptions({ inputSize: LIVE_INPUT_SIZE, scoreThreshold: 0.5 })).withFaceLandmarks(true);
+      const f = document.createElement('canvas');
+      f.width = 150;
+      f.height = 150;
+      await faceapi.computeFaceDescriptor(f);
+    })().catch((e) => {
+      warming = null;
+      throw e;
+    });
+  }
+  return warming;
+}
+
 /** Média de várias leituras do mesmo rosto (mais estável que uma só). */
 export function averageDescriptor(list: Descriptor[]): Descriptor {
   const out = new Array(128).fill(0);
@@ -105,6 +170,6 @@ export async function readFaceFromFile(file: File): Promise<FaceReading | null> 
 }
 
 /** Liveness simples: a pessoa vira o rosto de um lado para o outro (foto parada não passa). */
-export const LIVENESS_YAW_RANGE = 0.22;
+export const LIVENESS_YAW_RANGE = 0.2;
 /** Rosto de frente: usado para gerar a impressão numérica. */
 export const FRONTAL_YAW = 0.15;
