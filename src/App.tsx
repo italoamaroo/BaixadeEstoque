@@ -16,6 +16,7 @@ import { NotFoundPage } from '@/pages/NotFoundPage';
 // Carregamento sob demanda: telas pesadas (gráficos, câmera, Excel) só baixam quando usadas
 const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
 const NewMovementPage = lazy(() => import('@/pages/movimentacao/NewMovementPage').then((m) => ({ default: m.NewMovementPage })));
+const EmergencyMovementsPage = lazy(() => import('@/pages/EmergencyMovementsPage').then((m) => ({ default: m.EmergencyMovementsPage })));
 const MovementsPage = lazy(() => import('@/pages/MovementsPage').then((m) => ({ default: m.MovementsPage })));
 const MovementDetailPage = lazy(() => import('@/pages/detail/MovementDetailPage').then((m) => ({ default: m.MovementDetailPage })));
 const SaPendingPage = lazy(() => import('@/pages/SaPendingPage').then((m) => ({ default: m.SaPendingPage })));
@@ -67,6 +68,7 @@ function AppRoutes() {
               <Route path="balcao" element={<RequirePermission perm="useCounter"><CounterPage /></RequirePermission>} />
               <Route path="balcao/:id" element={<RequirePermission perm="useCounter"><CounterPage /></RequirePermission>} />
               <Route path="nova-saida" element={<RequirePermission perm="createMovement"><NewMovementPage /></RequirePermission>} />
+              <Route path="emergenciais" element={<RequirePermission perm="viewMovements"><EmergencyMovementsPage /></RequirePermission>} />
               <Route path="movimentacoes" element={<RequirePermission perm="viewMovements"><MovementsPage /></RequirePermission>} />
               <Route path="movimentacoes/:id" element={<RequirePermission perm="viewMovements"><MovementDetailPage /></RequirePermission>} />
               <Route path="pendencias-sa" element={<RequirePermission perm="viewPending"><SaPendingPage /></RequirePermission>} />

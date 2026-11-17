@@ -18,11 +18,12 @@ interface Props {
   /** mostra a pesquisa rápida acima do painel */
   quickSearch?: boolean;
   defaultOpen?: boolean;
+  emergencyOnly?: boolean;
 }
 
 let profileCache: ProfileName[] | null = null;
 
-export function FiltersPanel({ value, onApply, quickSearch = true, defaultOpen = false }: Props) {
+export function FiltersPanel({ value, onApply, quickSearch = true, defaultOpen = false, emergencyOnly = false }: Props) {
   const { warehouses } = useAuth();
   const [draft, setDraft] = useState<MovementFilters>(value);
   const [open, setOpen] = useState(defaultOpen);
@@ -43,13 +44,13 @@ export function FiltersPanel({ value, onApply, quickSearch = true, defaultOpen =
   }, [open]);
 
   const set = <K extends keyof MovementFilters>(k: K, v: MovementFilters[K]) => setDraft((d) => ({ ...d, [k]: v }));
-  const active = countActiveFilters(value);
+  const active = countActiveFilters(emergencyOnly ? { ...value, emergency: '' } : value);
 
   const apply = (f = draft) => {
     const err = validateFilters(f);
     setError(err);
     if (err) return;
-    onApply(f);
+    onApply(emergencyOnly ? { ...f, emergency: 'sim', pending_sa: false, sa_number: '' } : f);
   };
 
   const toggleStatus = (s: MovementStatus) =>
@@ -71,7 +72,7 @@ export function FiltersPanel({ value, onApply, quickSearch = true, defaultOpen =
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               className="h-10 w-full rounded-lg border-0 pl-9 pr-3 text-sm ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-brand-600"
-              placeholder="Pesquisa rápida: ME, SA, requisitante, material…"
+              placeholder={emergencyOnly ? 'Pesquisa rápida: ME, requisitante, material…' : 'Pesquisa rápida: ME, SA, requisitante, material…'}
               value={draft.q}
               onChange={(e) => set('q', e.target.value)}
               aria-label="Pesquisa rápida"
@@ -97,7 +98,7 @@ export function FiltersPanel({ value, onApply, quickSearch = true, defaultOpen =
             variant="ghost"
             icon={<RotateCcw className="h-4 w-4" />}
             onClick={() => {
-              const cleared = { ...EMPTY_FILTERS, status: [] };
+              const cleared = { ...EMPTY_FILTERS, status: [], ...(emergencyOnly ? { warehouse_id: value.warehouse_id, emergency: 'sim' as const } : {}) };
               setDraft(cleared);
               apply(cleared);
             }}
@@ -136,7 +137,7 @@ export function FiltersPanel({ value, onApply, quickSearch = true, defaultOpen =
             ))}
           </Select>
           <Input label="Número da ME" value={draft.me_number} onChange={(e) => set('me_number', e.target.value)} placeholder="ME-MUR-2026-…" />
-          <Input label="Número da SA" value={draft.sa_number} onChange={(e) => set('sa_number', e.target.value)} />
+          {!emergencyOnly && <Input label="Número da SA" value={draft.sa_number} onChange={(e) => set('sa_number', e.target.value)} />}
           <Input label="Material (nome/código/ref.)" value={draft.material} onChange={(e) => set('material', e.target.value)} />
           <Input label="Código do material" value={draft.material_code} onChange={(e) => set('material_code', e.target.value)} />
           <Input label="Referência" value={draft.reference} onChange={(e) => set('reference', e.target.value)} />
@@ -167,11 +168,11 @@ export function FiltersPanel({ value, onApply, quickSearch = true, defaultOpen =
               </option>
             ))}
           </Select>
-          <Select label="Tipo de ME" value={draft.emergency} onChange={(e) => set('emergency', e.target.value as MovementFilters['emergency'])}>
+          {!emergencyOnly && <Select label="Tipo de ME" value={draft.emergency} onChange={(e) => set('emergency', e.target.value as MovementFilters['emergency'])}>
             <option value="">Todas</option>
             <option value="nao">Normais</option>
             <option value="sim">Emergenciais (só controle)</option>
-          </Select>
+          </Select>}
           <Input label="Requisitante (nome ou matrícula)" value={draft.requester} onChange={(e) => set('requester', e.target.value)} />
           <Select label="Almoxarife (responsável pela baixa)" value={draft.storekeeper_id} onChange={(e) => set('storekeeper_id', e.target.value)}>
             <option value="">Todos</option>
@@ -208,7 +209,7 @@ export function FiltersPanel({ value, onApply, quickSearch = true, defaultOpen =
                 {STATUS_LABELS[s]}
               </button>
             ))}
-            <label className="ml-2 inline-flex items-center gap-2 text-sm text-slate-700">
+            {!emergencyOnly && <label className="ml-2 inline-flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"
                 className="h-4 w-4 rounded border-slate-300 text-brand-700"
@@ -216,7 +217,7 @@ export function FiltersPanel({ value, onApply, quickSearch = true, defaultOpen =
                 onChange={(e) => set('pending_sa', e.target.checked)}
               />
               Somente pendência de SA
-            </label>
+            </label>}
           </div>
         </fieldset>
 
@@ -227,7 +228,7 @@ export function FiltersPanel({ value, onApply, quickSearch = true, defaultOpen =
             variant="secondary"
             icon={<RotateCcw className="h-4 w-4" />}
             onClick={() => {
-              const cleared = { ...EMPTY_FILTERS, status: [] };
+              const cleared = { ...EMPTY_FILTERS, status: [], ...(emergencyOnly ? { warehouse_id: value.warehouse_id, emergency: 'sim' as const } : {}) };
               setDraft(cleared);
               apply(cleared);
             }}
