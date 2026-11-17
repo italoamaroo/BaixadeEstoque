@@ -5,9 +5,15 @@ insert into auth.users (id, email, raw_user_meta_data) values
  ('00000000-0000-0000-0000-00000000000a','admin@teste.local','{"full_name":"Ana Administradora"}'),
  ('00000000-0000-0000-0000-0000000000a1','almox.mur@teste.local','{"full_name":"Carlos Almoxarife"}'),
  ('00000000-0000-0000-0000-0000000000b1','sa@teste.local','{"full_name":"Beatriz Equipe SA"}'),
- ('00000000-0000-0000-0000-0000000000c1','gestor@teste.local','{"full_name":"Marcos Gestor"}')
+ ('00000000-0000-0000-0000-0000000000c1','gestor@teste.local','{"full_name":"Marcos Gestor"}'),
+ ('00000000-0000-0000-0000-0000000000e1','tablet.mur@teste.local','{"full_name":"Tablet Balcão Muribeca"}')
 on conflict do nothing;
 select public.bootstrap_admin('admin@teste.local','Ana Administradora');
 insert into user_roles(user_id, role) values ('00000000-0000-0000-0000-0000000000a1','almoxarife'),('00000000-0000-0000-0000-0000000000b1','equipe_sa'),('00000000-0000-0000-0000-0000000000c1','gestor') on conflict do nothing;
 insert into user_warehouses select '00000000-0000-0000-0000-0000000000a1', id from warehouses where code='MUR' on conflict do nothing;
+insert into user_roles(user_id, role) values ('00000000-0000-0000-0000-0000000000e1','terminal') on conflict do nothing;
+insert into user_warehouses select '00000000-0000-0000-0000-0000000000e1', id from warehouses where code='MUR' on conflict do nothing;
 insert into user_warehouses select u, w.id from warehouses w, unnest(array['00000000-0000-0000-0000-0000000000b1','00000000-0000-0000-0000-0000000000c1']::uuid[]) u on conflict do nothing;
+
+-- Contrato fixo das telas de saída (migração 21)
+update public.app_settings set default_contract_id = (select id from public.contracts where code = 'DEMO-CT-001') where id = 1;

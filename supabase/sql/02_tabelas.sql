@@ -268,6 +268,7 @@ create table if not exists public.stock_movements (
   service_order_text        text,
   fixed_asset_id            uuid references public.fixed_assets (id),
   fixed_asset_text          text,
+  requires_sa               boolean not null default true,
   application_location_id   uuid references public.application_locations (id),
   application_location_text text,
   notes                     text,
@@ -314,8 +315,9 @@ create table if not exists public.stock_movements (
     (status = 'cancelada' and cancelled_at is not null and cancelled_by is not null and length(btrim(coalesce(cancel_reason, ''))) >= 5)
     or (status <> 'cancelada')
   ),
+  -- ME sem ativo fixo não passa pela SA: vai direto para a baixa no ERP pelo almoxarife
   constraint stock_movements_sa_ck check (
-    status not in ('sa_informada', 'concluida') or sa_number is not null
+    status not in ('sa_informada', 'concluida') or sa_number is not null or not requires_sa
   ),
   constraint stock_movements_notes_ck check (notes is null or length(notes) <= 2000)
 );

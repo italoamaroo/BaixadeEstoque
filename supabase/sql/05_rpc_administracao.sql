@@ -526,3 +526,87 @@ $$;
 
 revoke execute on function public.import_employees(jsonb) from public, anon;
 grant execute on function public.import_employees(jsonb) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- Importação de tabelas auxiliares (ativos fixos, locais de aplicação,
+-- contratos, setores, frentes, OS, contas, categorias) por planilha.
+-- Atualiza pelo código: se já existe, atualiza o nome (e "ativo", se vier).
+-- p_rows: [{code, name, active?, kind?}]
+-- ---------------------------------------------------------------------
+create or replace function public.import_lookups(p_table text, p_rows jsonb)
+returns jsonb
+language plpgsql security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_row      jsonb;
+  v_idx      int := 0;
+  v_inserted int := 0;
+  v_updated  int := 0;
+  v_errors   jsonb := '[]'::jsonb;
+  v_code     text;
+  v_name     text;
+  v_kind     text;
+  v_active   boolean;
+  v_exists   boolean;
+begin
+  if not public.can_manage_master_data() then
+    raise exception 'Somente administrador ou almoxarife pode importar cadastros.' using errcode = '42501';
+  end if;
+  if p_table not in ('contracts', 'sectors', 'service_fronts', 'service_orders', 'fixed_assets',
+                     'application_locations', 'accounts', 'material_categories') then
+    raise exception 'Tabela de cadastro inválida.' using errcode = '22023';
+  end if;
+  if jsonb_typeof(p_rows) <> 'array' then
+    raise exception 'Formato de importação inválido.' using errcode = '22023';
+  end if;
+  if jsonb_array_length(p_rows) > 5000 then
+    raise exception 'Importe no máximo 5.000 linhas por vez.' using errcode = '22023';
+  end if;
+
+  perform set_config('app.source', 'importacao', true);
+
+  for v_row in select * from jsonb_array_elements(p_rows) loop
+    v_idx := v_idx + 1;
+    begin
+      v_code := upper(btrim(coalesce(v_row ->> 'code', '')));
+      v_name := regexp_replace(btrim(coalesce(v_row ->> 'name', '')), '\s+', ' ', 'g');
+      if v_code = '' then raise exception 'código vazio'; end if;
+      if length(v_code) > 40 then raise exception 'código com mais de 40 caracteres'; end if;
+      if length(v_name) < 2 then raise exception 'nome vazio ou muito curto'; end if;
+      v_name := left(v_name, 160);
+      v_active := case when v_row ? 'active' then (v_row ->> 'active')::boolean else null end;
+
+      execute format('select exists (select 1 from public.%I where upper(code) = $1)', p_table) into v_exists using v_code;
+
+      if p_table = 'service_fronts' then
+        v_kind := lower(btrim(coalesce(v_row ->> 'kind', '')));
+        v_kind := case when v_kind like 'equip%' then 'equipamento' when v_kind = '' then null else 'frente' end;
+        if v_exists then
+          update public.service_fronts
+             set name = v_name, kind = coalesce(v_kind, kind), active = coalesce(v_active, active)
+           where upper(code) = v_code;
+        else
+          insert into public.service_fronts (code, name, kind, active)
+          values (v_code, v_name, coalesce(v_kind, 'frente'), coalesce(v_active, true));
+        end if;
+      elsif v_exists then
+        execute format('update public.%I set name = $1, active = coalesce($2, active) where upper(code) = $3', p_table)
+          using v_name, v_active, v_code;
+      else
+        execute format('insert into public.%I (code, name, active) values ($1, $2, coalesce($3, true))', p_table)
+          using v_code, v_name, v_active;
+      end if;
+
+      if v_exists then v_updated := v_updated + 1; else v_inserted := v_inserted + 1; end if;
+    exception when others then
+      v_errors := v_errors || jsonb_build_object('linha', v_idx, 'codigo', v_row ->> 'code', 'erro', sqlerrm);
+    end;
+  end loop;
+
+  return jsonb_build_object('inseridos', v_inserted, 'atualizados', v_updated, 'erros', v_errors);
+end;
+$$;
+
+revoke all on function public.import_lookups(text, jsonb) from public;
+grant execute on function public.import_lookups(text, jsonb) to authenticated;

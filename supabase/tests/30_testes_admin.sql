@@ -29,7 +29,7 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
 insert into storage.objects (bucket_id, name, owner, metadata)
 values ('assinaturas', 'MUR/' || :'ano' || '/' || :'me4' || '/assinatura_1.png', auth.uid(), '{"size": 100}');
-select public.create_movement(format($${"id":"%s","warehouse_id":"%s","contract_id":"%s","sector_id":"%s","requester_employee_id":"%s",
+select public.create_movement(format($${"id":"%s","warehouse_id":"%s","contract_id":"%s","sector_id":"%s","fixed_asset_text":"AF-TESTE","requester_employee_id":"%s",
   "items":[{"material_id":"%s","quantity_requested":1,"quantity_delivered":1}],"signature":{"storage_path":"MUR/%s/%s/assinatura_1.png"}}$$,
   :'me4', :'mur', :'contrato', :'setor', :'func1', :'oleo', :'ano', :'me4')::jsonb) ->> 'status' as st \gset
 select testes.igual(:'st'::text, 'aguardando_aprovacao', 'com aprovação ativa, ME aguarda aprovação');
@@ -59,7 +59,7 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
 insert into storage.objects (bucket_id, name, owner, metadata)
 values ('assinaturas', 'MUR/' || :'ano' || '/' || :'me5' || '/assinatura_1.png', auth.uid(), '{"size": 100}');
-select public.create_movement(format($${"id":"%s","warehouse_id":"%s","contract_id":"%s","sector_id":"%s","requester_employee_id":"%s",
+select public.create_movement(format($${"id":"%s","warehouse_id":"%s","contract_id":"%s","sector_id":"%s","fixed_asset_text":"AF-TESTE","requester_employee_id":"%s",
   "items":[{"material_id":"%s","quantity_requested":1,"quantity_delivered":1}],"signature":{"storage_path":"MUR/%s/%s/assinatura_1.png"}}$$,
   :'me5', :'mur', :'contrato', :'setor', :'func1', :'oleo', :'ano', :'me5')::jsonb);
 select testes.falha(format($$select public.cancel_movement('%s', '')$$, :'me5'), 'justificativa');
@@ -103,3 +103,59 @@ select testes.falha($$insert into public.materials (code, name, unit) values ('S
 select testes.falha($$select public.import_materials('[]')$$, 'Somente administrador ou almoxarife');
 commit;
 \echo '>>> TESTES DE CADASTRO PELO ALMOXARIFE PASSARAM'
+
+-- ME sem ativo fixo: não passa pela SA, vai direto para a baixa no ERP
+\set me6 '66666666-6666-4666-8666-666666666666'
+\set me7 '77777777-7777-4777-8777-777777777777'
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', true);
+select public.update_settings('{"require_approval": false}');
+commit;
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+insert into storage.objects (bucket_id, name, owner, metadata) values
+  ('assinaturas', 'MUR/' || :'ano' || '/' || :'me6' || '/assinatura_1.png', auth.uid(), '{"size": 100}'),
+  ('assinaturas', 'MUR/' || :'ano' || '/' || :'me7' || '/assinatura_1.png', auth.uid(), '{"size": 100}');
+select testes.igual((public.create_movement(format($${"id":"%s","warehouse_id":"%s","contract_id":"%s","sector_id":"%s","requester_employee_id":"%s",
+  "items":[{"material_id":"%s","quantity_requested":1,"quantity_delivered":1}],"signature":{"storage_path":"MUR/%s/%s/assinatura_1.png"}}$$,
+  :'me6', :'mur', :'contrato', :'setor', :'func1', :'oleo', :'ano', :'me6')::jsonb) ->> 'status'), 'sa_informada', 'ME sem ativo vai direto para baixa no ERP');
+select testes.igual((select requires_sa from public.stock_movements where id = :'me6'), false, 'ME sem ativo não exige SA');
+select public.create_movement(format($${"id":"%s","warehouse_id":"%s","contract_id":"%s","sector_id":"%s","requester_employee_id":"%s",
+  "items":[{"material_id":"%s","quantity_requested":1,"quantity_delivered":1}],"signature":{"storage_path":"MUR/%s/%s/assinatura_1.png"}}$$,
+  :'me7', :'mur', :'contrato', :'setor', :'func1', :'oleo', :'ano', :'me7')::jsonb);
+commit;
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b1', true);
+select testes.falha(format($$select public.inform_sa('%s', 'SA-NAO-1')$$, :'me6'), 'não precisa de SA');
+commit;
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+select testes.igual((public.complete_movement(:'me6', 'DOC-1') ->> 'status'), 'concluida', 'almoxarife conclui ME sem SA');
+select testes.igual((select reason from public.movement_status_history where movement_id = :'me6' and to_status = 'concluida' order by id desc limit 1),
+                    'Baixa realizada no ERP sem SA (ME sem ativo fixo). Documento ERP: DOC-1', 'histórico de baixa sem SA');
+select testes.igual((public.cancel_movement(:'me7', 'Devolução do material') ->> 'status'), 'cancelada', 'almoxarife cancela ME sem ativo antes da baixa no ERP');
+commit;
+\echo '>>> TESTES DE ME SEM ATIVO FIXO PASSARAM'
+
+-- Importação de cadastros auxiliares
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+select testes.igual((public.import_lookups('fixed_assets', '[{"code":"af-900","name":"Caminhão 900"},{"code":"AF-901","name":"Pá carregadeira"},{"code":"","name":"x"}]') ->> 'inseridos')::int, 2, 'importa ativos fixos');
+select testes.igual((public.import_lookups('fixed_assets', '[{"code":"AF-900","name":"Caminhão 900 atualizado","active":false}]') ->> 'atualizados')::int, 1, 'atualiza ativo pelo código');
+select testes.igual((select name || '/' || active::text from public.fixed_assets where code = 'AF-900'), 'Caminhão 900 atualizado/false', 'nome e situação atualizados');
+select testes.igual((public.import_lookups('application_locations', '[{"code":"LOC-1","name":"Oficina central"}]') ->> 'inseridos')::int, 1, 'importa locais de aplicação');
+select testes.igual((public.import_lookups('service_fronts', '[{"code":"EQ-9","name":"Retro 9","kind":"Equipamento"}]') ->> 'inseridos')::int, 1, 'importa frente/equipamento');
+select testes.igual((select kind from public.service_fronts where code = 'EQ-9'), 'equipamento', 'tipo equipamento');
+select testes.falha($$select public.import_lookups('warehouses', '[]')$$, 'Tabela de cadastro inválida');
+commit;
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b1', true);
+select testes.falha($$select public.import_lookups('fixed_assets', '[]')$$, 'Somente administrador ou almoxarife');
+commit;
+\echo '>>> TESTES DE IMPORTAÇÃO DE CADASTROS PASSARAM'

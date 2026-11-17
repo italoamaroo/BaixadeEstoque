@@ -1,7 +1,7 @@
 import os, re, sys, time
 from playwright.sync_api import sync_playwright, expect
 
-BASE = 'http://localhost:5173'
+BASE = os.environ.get('E2E_BASE', 'http://localhost:5173')
 OUT = os.environ.get('E2E_OUT', 'tests/e2e/capturas')
 os.makedirs(OUT, exist_ok=True)
 errors = []
@@ -67,10 +67,13 @@ with sync_playwright() as p:
     page.get_by_role('button', name=re.compile(r'^Continuar \(2 itens\)')).click()
 
     # dados
-    page.get_by_label('Contrato').select_option(index=1)
+    expect(page.get_by_text(re.compile('DEMO-CT-001 – Coleta domiciliar'))).to_be_visible()  # contrato fixo
     page.get_by_label('Setor').select_option(label='Manutenção mecânica')
     page.get_by_label('Frente de serviço / equipamento').select_option(index=4)
     page.get_by_label('Ordem de serviço').fill('DEMO-OS-24101')
+    expect(page.get_by_text('Sem ativo fixo: a ME não passa pela SA')).to_be_visible()
+    page.get_by_label('Ativo fixo (AF)').fill('DEMO-AF-0101')
+    expect(page.get_by_text('Com ativo fixo: a ME vai para a equipe de SA')).to_be_visible()
     page.screenshot(path=f'{OUT}/06_dados.png', full_page=True)
     page.get_by_role('button', name='Continuar', exact=True).click()
 
@@ -116,10 +119,27 @@ with sync_playwright() as p:
     page.get_by_label('Número da SA').fill('SA-2026-000123')
     page.get_by_role('button', name='Informar SA').last.click()
     page.wait_for_timeout(1200)
-    page.get_by_role('button', name=re.compile('SA informada')).click()
+    page.get_by_role('button', name=re.compile('Aguardando baixa no ERP')).click()
     page.wait_for_timeout(1000)
-    page.get_by_role('button', name='Concluir', exact=True).first.click()
-    expect(page.get_by_text('concluída.').first).to_be_visible(timeout=10000)
+    # equipe de SA não confirma a baixa no ERP
+    expect(page.get_by_role('button', name='Confirmar baixa no ERP')).to_have_count(0)
+    ctx.close()
+
+    # ---------------- Almoxarife: baixa no ERP com a SA ----------------
+    ctx = browser.new_context(viewport={'width': 1366, 'height': 900})
+    page = ctx.new_page(); attach(page, 'almox-erp')
+    login(page, 'almox.mur@teste.local')
+    page.goto(f'{BASE}/pendencias-sa'); page.wait_for_timeout(1500)
+    page.screenshot(path=f'{OUT}/11b_baixa_erp_lista.png', full_page=True)
+    page.get_by_role('button', name='Confirmar baixa no ERP').first.click()
+    expect(page.get_by_text('SA-2026-000123').last).to_be_visible(timeout=10000)
+    page.wait_for_timeout(800)
+    page.get_by_label('Nº do documento de baixa no ERP (opcional)').fill('DOC-778')
+    page.screenshot(path=f'{OUT}/11c_baixa_erp_modal.png')
+    expect(page.get_by_role('button', name='Confirmar baixa', exact=True)).to_be_disabled()
+    page.get_by_label(re.compile('Confirmo que realizei a baixa no ERP')).check()
+    page.get_by_role('button', name='Confirmar baixa', exact=True).click()
+    expect(page.get_by_text('Baixa no ERP confirmada').first).to_be_visible(timeout=10000)
     page.wait_for_timeout(1200)
     ctx.close()
 

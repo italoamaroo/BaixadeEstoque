@@ -11,12 +11,13 @@ import { fmtDateTime, fmtInt } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 import { Alert, Card, CardHeader, EmptyState, PageHeader } from '@/components/ui/Card';
 import { Modal } from '@/components/ui/Modal';
+import { PageLoader } from '@/components/ui/Spinner';
 
 /** Saídas registradas sem internet, guardadas neste aparelho. */
 export function OfflineQueuePage() {
   const { userId, settings } = useAuth();
   const online = useOnlineStatus();
-  const { items } = useOfflineQueue();
+  const { items, error, loading } = useOfflineQueue();
   const [info, setInfo] = useState<OfflineCacheInfo | undefined>();
   const [busy, setBusy] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -34,6 +35,8 @@ export function OfflineQueuePage() {
       if (r.sent.length) toast.success(`${r.sent.length} saída(s) enviada(s): ${r.sent.map((s) => s.me_number).join(', ')}`);
       if (r.stoppedByNetwork) toast.error('Sem conexão com o servidor. As saídas continuam guardadas no aparelho.');
       if (r.failed.length) toast.error(`${r.failed.length} saída(s) com erro. Veja o motivo na lista.`);
+    } catch (e) {
+      toast.error(errorMessage(e, 'Não foi possível acessar a fila offline.'));
     } finally {
       setBusy(false);
     }
@@ -70,8 +73,12 @@ export function OfflineQueuePage() {
       )}
 
       <Card padded={false}>
-        {items.length === 0 ? (
-          <EmptyState title="Nenhuma saída aguardando envio" description="Tudo o que foi registrado neste aparelho já está no servidor." />
+        {error ? (
+          <div className="p-4"><Alert tone="error">Não foi possível consultar as saídas guardadas. Reabra esta tela para tentar novamente.</Alert></div>
+        ) : loading ? (
+          <PageLoader />
+        ) : items.length === 0 ? (
+          <EmptyState title="Nenhuma saída aguardando envio nesta conta" />
         ) : (
           <ul className="divide-y divide-slate-100">
             {items.map((q) => (

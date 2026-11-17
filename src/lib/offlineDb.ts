@@ -37,8 +37,8 @@ function tx<T>(store: 'kv' | 'queue', mode: IDBTransactionMode, fn: (s: IDBObjec
       new Promise<T>((resolve, reject) => {
         const t = db.transaction(store, mode);
         const req = fn(t.objectStore(store));
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
+        t.oncomplete = () => resolve(req.result);
+        t.onabort = () => reject(t.error ?? req.error ?? new Error('A operação no armazenamento local foi interrompida.'));
       }),
   );
 }
@@ -53,6 +53,6 @@ export async function kvClearPrefix(prefix: string) {
   for (const k of keys) await kvDel(k as string).catch(() => undefined);
 }
 
-export const queueAll = <T>() => tx<T[]>('queue', 'readonly', (s) => s.getAll() as IDBRequest<T[]>).catch(() => [] as T[]);
+export const queueAll = <T>() => tx<T[]>('queue', 'readonly', (s) => s.getAll() as IDBRequest<T[]>);
 export const queuePut = (value: unknown) => tx('queue', 'readwrite', (s) => s.put(value)).then(() => undefined);
 export const queueDel = (id: string) => tx('queue', 'readwrite', (s) => s.delete(id)).then(() => undefined);

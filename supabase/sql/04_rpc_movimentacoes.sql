@@ -393,7 +393,24 @@ declare
   v_year         int;
   v_now          timestamptz := now();
   v_signed_at    timestamptz;
+  v_at           timestamptz;             -- data/hora real da retirada
+  v_offline      boolean := false;
 begin
+  -- Saída registrada sem internet: usa a data/hora real da retirada (até 7 dias atrás)
+  if nullif(p_payload ->> 'offline_at', '') is not null then
+    begin
+      v_at := (p_payload ->> 'offline_at')::timestamptz;
+    exception when others then
+      raise exception 'Data/hora da saída offline inválida.' using errcode = '22023';
+    end;
+    if v_at > v_now + interval '5 minutes' or v_at < v_now - interval '7 days' then
+      raise exception 'Saída offline com data fora do prazo (até 7 dias). Registre pela contingência em papel.' using errcode = '22023';
+    end if;
+    v_offline := true;
+  else
+    v_at := v_now;
+  end if;
+
   -- 1) Autenticação e perfil
   if v_uid is null or not public.is_active_user() then
     raise exception 'Sessão inválida ou usuário inativo.' using errcode = '42501';
@@ -506,7 +523,7 @@ begin
   end if;
 
   -- 7) Assinatura (obrigatória)
-  v_year := extract(year from (v_now at time zone s.timezone))::int;
+  v_year := extract(year from (v_at at time zone s.timezone))::int;
   v_sig_path := nullif(btrim(coalesce(v_sig ->> 'storage_path', '')), '');
   if v_sig_path is null then
     raise exception 'A assinatura do funcionário é obrigatória para finalizar a ME.' using errcode = '22023';
@@ -527,34 +544,37 @@ begin
   end if;
 
   begin
-    v_signed_at := coalesce(nullif(v_sig ->> 'signed_at', '')::timestamptz, v_now);
+    v_signed_at := coalesce(nullif(v_sig ->> 'signed_at', '')::timestamptz, v_at);
   exception when others then
-    v_signed_at := v_now;
+    v_signed_at := v_at;
   end;
-  if v_signed_at > v_now + interval '5 minutes' or v_signed_at < v_now - interval '1 day' then
-    v_signed_at := v_now;
+  if v_signed_at > v_now + interval '5 minutes' or v_signed_at < v_at - interval '1 day' then
+    v_signed_at := v_at;
   end if;
 
   -- 8) Gravação
   perform set_config('app.creating', 'on', true);
-  perform set_config('app.source', coalesce(nullif(p_payload ->> 'source', ''), 'app'), true);
+  perform set_config('app.source', case when v_offline then 'offline' else coalesce(nullif(p_payload ->> 'source', ''), 'app') end, true);
 
-  v_number := public.next_me_number(v_wh.id, v_now);
-  v_status := case when s.require_approval then 'aguardando_aprovacao' else 'aguardando_sa' end;
+  v_number := public.next_me_number(v_wh.id, v_at);
+  -- Sem ativo fixo: não precisa de SA, vai direto para a baixa no ERP (status sa_informada sem número de SA)
+  v_status := case when s.require_approval then 'aguardando_aprovacao'
+                   when v_fa_text is null then 'sa_informada'
+                   else 'aguardando_sa' end;
 
   insert into public.stock_movements (
     id, me_number, movement_type, movement_at, warehouse_id, contract_id, sector_id,
-    service_front_id, service_order_id, service_order_text, fixed_asset_id, fixed_asset_text,
-    application_location_id, application_location_text, notes, status,
+    service_front_id, service_order_id, service_order_text, fixed_asset_id, fixed_asset_text, requires_sa,
+    application_location_id, application_location_text, notes, status, entry_channel,
     requester_employee_id, requester_name, requester_registration, requested_at,
     received_by_employee_id, received_by_name, received_by_registration, received_at,
     storekeeper_id, created_by, updated_by, created_at
   ) values (
-    v_id, v_number, 'saida', v_now, v_wh.id, v_contract_id, v_sector_id,
-    v_front_id, v_so_id, v_so_text, v_fa_id, v_fa_text,
+    v_id, v_number, 'saida', v_at, v_wh.id, v_contract_id, v_sector_id,
+    v_front_id, v_so_id, v_so_text, v_fa_id, v_fa_text, v_fa_text is not null,
     v_appl_id, nullif(btrim(coalesce(p_payload ->> 'application_location_text', '')), ''),
-    nullif(btrim(coalesce(p_payload ->> 'notes', '')), ''), v_status,
-    v_requester.id, v_requester.full_name, v_requester.registration, v_now,
+    nullif(btrim(coalesce(p_payload ->> 'notes', '')), ''), v_status, case when v_offline then 'offline' else 'assistente' end,
+    v_requester.id, v_requester.full_name, v_requester.registration, v_at,
     v_receiver.id, v_receiver.full_name, v_receiver.registration, v_signed_at,
     v_uid, v_uid, v_uid, v_now
   );
@@ -662,11 +682,13 @@ begin
   perform set_config('app.audit_action', 'me.aprovada', true);
   perform set_config('app.justification', coalesce(p_notes, ''), true);
 
+  -- Com ativo fixo vai para a SA; sem ativo vai direto para a baixa no ERP
   update public.stock_movements
-     set status = 'aguardando_sa', approved_by = auth.uid(), approved_at = now()
+     set status = case when v_m.requires_sa then 'aguardando_sa'::public.movement_status else 'sa_informada'::public.movement_status end,
+         approved_by = auth.uid(), approved_at = now()
    where id = p_id;
 
-  return jsonb_build_object('id', p_id, 'status', 'aguardando_sa');
+  return jsonb_build_object('id', p_id, 'status', case when v_m.requires_sa then 'aguardando_sa' else 'sa_informada' end);
 end;
 $$;
 
@@ -702,6 +724,10 @@ begin
   select * into v_m from public.stock_movements where id = p_id for update;
   if v_m.id is null or not public.can_access_warehouse(v_m.warehouse_id) then
     raise exception 'ME não encontrada.' using errcode = 'P0002';
+  end if;
+  if not v_m.requires_sa then
+    raise exception 'A ME % não tem ativo fixo e não precisa de SA: a baixa é feita direto no ERP pelo almoxarife.', v_m.me_number
+      using errcode = 'P0001';
   end if;
 
   if v_m.status = 'aguardando_sa' then
@@ -761,18 +787,31 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------
--- Concluir (SA informada e validada)
+-- Concluir: almoxarife confirma a baixa no ERP com a SA informada
 -- ---------------------------------------------------------------------
-create or replace function public.complete_movement(p_id uuid)
+create or replace function public.complete_movement(
+  p_id           uuid,
+  p_erp_document text default null,
+  p_notes        text default null
+)
 returns jsonb
 language plpgsql security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_m public.stock_movements;
+  v_m     public.stock_movements;
+  v_doc   text := nullif(btrim(coalesce(p_erp_document, '')), '');
+  v_notes text := nullif(btrim(coalesce(p_notes, '')), '');
+  v_text  text;
 begin
-  if not public.has_any_role(array['equipe_sa', 'gestor', 'admin']::public.app_role[]) then
-    raise exception 'Seu perfil não permite concluir a ME.' using errcode = '42501';
+  if not public.has_any_role(array['almoxarife', 'gestor', 'admin']::public.app_role[]) then
+    raise exception 'Seu perfil não permite confirmar a baixa no ERP.' using errcode = '42501';
+  end if;
+  if v_doc is not null and length(v_doc) > 60 then
+    raise exception 'O documento do ERP deve ter no máximo 60 caracteres.' using errcode = '22023';
+  end if;
+  if v_notes is not null and length(v_notes) > 500 then
+    raise exception 'A observação deve ter no máximo 500 caracteres.' using errcode = '22023';
   end if;
 
   select * into v_m from public.stock_movements where id = p_id for update;
@@ -780,15 +819,22 @@ begin
     raise exception 'ME não encontrada.' using errcode = 'P0002';
   end if;
   if v_m.status <> 'sa_informada' then
-    raise exception 'Somente MEs com SA informada podem ser concluídas (status atual: %).', v_m.status using errcode = 'P0001';
+    raise exception 'Somente MEs aguardando baixa no ERP podem ser confirmadas (status atual: %).', v_m.status
+      using errcode = 'P0001';
   end if;
 
+  v_text := case when v_m.sa_number is null then 'Baixa realizada no ERP sem SA (ME sem ativo fixo)'
+                 else 'Baixa realizada no ERP com a SA ' || v_m.sa_number end
+         || coalesce('. Documento ERP: ' || v_doc, '')
+         || coalesce('. Obs.: ' || v_notes, '');
+
   perform set_config('app.audit_action', 'me.concluida', true);
+  perform set_config('app.justification', v_text, true);
   update public.stock_movements
      set status = 'concluida', completed_at = now(), completed_by = auth.uid()
    where id = p_id;
 
-  return jsonb_build_object('id', p_id, 'status', 'concluida');
+  return jsonb_build_object('id', p_id, 'status', 'concluida', 'sa_number', v_m.sa_number);
 end;
 $$;
 
@@ -808,7 +854,9 @@ declare
 begin
   -- Gestor/admin: cancelam em qualquer status.
   -- Almoxarife: somente devolução/erro ANTES do lançamento no ERP
-  -- (status Aguardando SA ou Aguardando aprovação), no estoque autorizado.
+  -- (Em separação/Aguardando confirmação no balcão, Aguardando SA, Aguardando aprovação ou,
+  --  em ME sem ativo, Aguardando baixa no ERP),
+  -- no estoque autorizado.
   if not v_manager and not v_storekeeper then
     raise exception 'Seu perfil não permite cancelar uma ME.' using errcode = '42501';
   end if;
@@ -823,7 +871,9 @@ begin
   if v_m.status = 'cancelada' then
     raise exception 'A ME % já está cancelada.', v_m.me_number using errcode = 'P0001';
   end if;
-  if not v_manager and v_m.status not in ('aguardando_sa', 'aguardando_aprovacao') then
+  if not v_manager
+     and v_m.status not in ('rascunho', 'aguardando_assinatura', 'aguardando_sa', 'aguardando_aprovacao')
+     and not (v_m.status = 'sa_informada' and not v_m.requires_sa) then
     raise exception 'A ME % já tem SA lançada no ERP. Somente gestor ou administrador pode cancelá-la.', v_m.me_number
       using errcode = '42501';
   end if;
@@ -1037,7 +1087,7 @@ begin
   if not public.is_active_user() then
     raise exception 'Sessão inválida ou usuário inativo.' using errcode = '42501';
   end if;
-  if p_action not in ('me.impressa', 'me.pdf_gerado', 'me.assinatura_consultada',
+  if p_action not in ('me.impressa', 'me.pdf_gerado', 'me.assinatura_consultada', 'me.foto_consultada',
                       'exportacao.excel', 'etiquetas.impressas', 'qr.leitura_nao_encontrada') then
     raise exception 'Evento não permitido.' using errcode = '22023';
   end if;

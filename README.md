@@ -88,7 +88,7 @@ Abra **SQL Editor → New query** e execute **na ordem**:
 
 **Atalho:** `supabase/instalar_completo.sql` junta os arquivos 1 a 8 em um só. Para regenerá-lo: `npm run sql:montar`.
 
-Os scripts podem ser **reexecutados** com segurança (`create or replace`, `if not exists`, `on conflict`).
+O instalador completo é destinado a **bancos novos**. Em bancos existentes, confira o histórico e aplique apenas as migrações necessárias, na ordem documentada em [`docs/ESTRUTURA_E_BANCO.md`](docs/ESTRUTURA_E_BANCO.md). Reaplicar a base sobre um banco evoluído pode falhar ao substituir views.
 
 > Não execute `supabase/tests/00_stubs_supabase_local.sql` no Supabase. Ele existe só para testes em PostgreSQL local.
 
@@ -345,3 +345,23 @@ Cobertura de `npm run test:sql`:
 9. **Auditoria completa e imutável** de criação, itens, assinatura, aprovação, SA, status, cancelamento, correções, impressão, exportação e cadastros.
 10. **Permissões no banco**, não só na tela: RLS + funções com checagem de perfil e estoque.
 11. **Indicadores sem misturar unidades**: quantidade de MEs, linhas de itens e soma de quantidades aparecem separados. As quantidades por material ficam na unidade do material.
+
+
+## Verificações automáticas e organização
+
+O projeto mantém uma única árvore de código em `src/`, SQL em `supabase/` e scripts em `scripts/`.
+Os arquivos avulsos de uploads anteriores foram removidos; as versões anteriores continuam no histórico Git.
+
+```bash
+npm ci
+npm run check        # estrutura, SQL consolidado atualizado, testes unitários e build
+npm run sql:montar   # regenera o instalador quando os scripts da base mudarem
+npm run test:sql     # PostgreSQL local descartável; requer PGHOST, PGPORT e PGUSER
+```
+
+O workflow `.github/workflows/ci.yml` executa as verificações em pull requests e na `main`, com
+PostgreSQL 16 isolado para testes de fluxo, permissões, auditoria e concorrência. Não usa credenciais
+de produção e não publica o sistema. Configure esses checks como obrigatórios nas regras da `main`
+se desejar impedir merges com falhas; a criação do workflow, sozinha, não altera essa regra.
+
+Consulte [estrutura, conferência do banco e migrações](docs/ESTRUTURA_E_BANCO.md).

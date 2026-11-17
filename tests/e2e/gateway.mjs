@@ -14,6 +14,7 @@ const USERS = {
   'almox.mur@teste.local': '00000000-0000-0000-0000-0000000000a1',
   'sa@teste.local': '00000000-0000-0000-0000-0000000000b1',
   'gestor@teste.local': '00000000-0000-0000-0000-0000000000c1',
+  'tablet.mur@teste.local': '00000000-0000-0000-0000-0000000000e1',
 };
 const b64u = (b) => Buffer.from(b).toString('base64url');
 export function sign(payload) {
@@ -102,33 +103,39 @@ http
     if (url.pathname === '/auth/v1/logout') return send(res, 204, '');
     if (url.pathname === '/auth/v1/recover') return send(res, 200, {});
 
-    const up = /^\/storage\/v1\/object\/(assinaturas)\/(.+)$/.exec(url.pathname);
+    const up = /^\/storage\/v1\/object\/(assinaturas|fotos-retirada)\/(.+)$/.exec(url.pathname);
     if (up && req.method === 'POST') {
       const [, bucket, name] = up;
       const n = decodeURIComponent(name);
       try {
-        psqlAs(claims.sub, `insert into storage.objects (bucket_id, name, owner, metadata) values ('${bucket}', '${n.replace(/'/g, "''")}', '${claims.sub}', '{"size": ${body.length}, "mimetype": "image/png"}')`);
+        psqlAs(claims.sub, `insert into storage.objects (bucket_id, name, owner, metadata) values ('${bucket}', '${n.replace(/'/g, "''")}', '${claims.sub}', '{"size": ${body.length}, "mimetype": "${bucket === 'fotos-retirada' ? 'image/jpeg' : 'image/png'}"}')`);
       } catch (e) {
         const dup = /duplicate key/.test(String(e.stderr));
         return send(res, dup ? 409 : 403, { statusCode: dup ? '409' : '403', error: dup ? 'Duplicate' : 'Unauthorized', message: dup ? 'The resource already exists' : 'new row violates row-level security policy' });
       }
       fs.mkdirSync(path.dirname(path.join(FILES, bucket, n)), { recursive: true });
-      // supabase-js envia multipart quando o corpo é Blob/FormData; extrai o PNG
-      const start = body.indexOf(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
-      fs.writeFileSync(path.join(FILES, bucket, n), start >= 0 ? body.subarray(start) : body);
+      // supabase-js envia multipart quando o corpo é Blob/FormData; extrai o PNG ou o JPEG
+      let start = body.indexOf(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+      let end = body.length;
+      if (start < 0) {
+        start = body.indexOf(Buffer.from([0xff, 0xd8, 0xff]));
+        const eoi = body.lastIndexOf(Buffer.from([0xff, 0xd9]));
+        if (start >= 0 && eoi > start) end = eoi + 2;
+      }
+      fs.writeFileSync(path.join(FILES, bucket, n), start >= 0 ? body.subarray(start, end) : body);
       return send(res, 200, { Key: `${bucket}/${n}`, Id: crypto.randomUUID() });
     }
-    const sg = /^\/storage\/v1\/object\/sign\/(assinaturas)\/(.+)$/.exec(url.pathname);
+    const sg = /^\/storage\/v1\/object\/sign\/(assinaturas|fotos-retirada)\/(.+)$/.exec(url.pathname);
     if (sg && req.method === 'POST') {
       const n = decodeURIComponent(sg[2]);
-      const out = psqlAs(claims.sub, `select count(*) from storage.objects where bucket_id='assinaturas' and name='${n.replace(/'/g, "''")}'`).trim().split('\n').pop();
+      const out = psqlAs(claims.sub, `select count(*) from storage.objects where bucket_id='${sg[1]}' and name='${n.replace(/'/g, "''")}'`).trim().split('\n').pop();
       if (out !== '1') return send(res, 400, { statusCode: '404', error: 'not_found', message: 'Object not found' });
-      return send(res, 200, { signedURL: `/object/sign/assinaturas/${sg[2]}?token=ok` });
+      return send(res, 200, { signedURL: `/object/sign/${sg[1]}/${sg[2]}?token=ok` });
     }
     if (sg && req.method === 'GET') {
-      const file = path.join(FILES, 'assinaturas', decodeURIComponent(sg[2]));
+      const file = path.join(FILES, sg[1], decodeURIComponent(sg[2]));
       if (!fs.existsSync(file)) return send(res, 404, { message: 'not found' });
-      return send(res, 200, fs.readFileSync(file), { 'Content-Type': 'image/png' });
+      return send(res, 200, fs.readFileSync(file), { 'Content-Type': sg[1] === 'fotos-retirada' ? 'image/jpeg' : 'image/png' });
     }
     send(res, 404, { message: `não simulado: ${req.method} ${url.pathname}` });
   })
