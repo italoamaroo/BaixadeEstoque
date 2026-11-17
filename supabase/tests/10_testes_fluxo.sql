@@ -170,7 +170,7 @@ select testes.igual((public.search_movements('{}', 1, 25) ->> 'total')::int, 0, 
 
 insert into storage.objects (bucket_id, name, owner, metadata)
 values ('assinaturas', 'DIR/' || :'ano' || '/' || :'me2' || '/assinatura_1.png', auth.uid(), '{"size": 3000}');
-select public.create_movement(format($${"id":"%s","warehouse_id":"%s","contract_id":"%s","sector_id":"%s","requester_employee_id":"%s",
+select public.create_movement(format($${"id":"%s","warehouse_id":"%s","contract_id":"%s","sector_id":"%s","fixed_asset_text":"DEMO-AF-0102","requester_employee_id":"%s",
   "items":[{"material_id":"%s","quantity_requested":4,"quantity_delivered":4}],
   "signature":{"storage_path":"DIR/%s/%s/assinatura_1.png"}}$$,
   :'me2', :'dir', :'contrato', :'setor', :'func1', :'filtro', :'ano', :'me2')::jsonb) as r2 \gset
@@ -204,7 +204,28 @@ select testes.igual((select sa_number from public.stock_movements where id = :'m
 select testes.falha(format($$select public.inform_sa('%s', 'SA-2026-0001')$$, :'me2'), 'já está vinculada');
 select testes.falha(format($$select public.inform_sa('%s', 'SA-2026-0009')$$, :'me1'), 'justificativa');
 select testes.igual((public.inform_sa(:'me1', 'SA-2026-0009', 'Número digitado errado no ERP') ->> 'action'), 'correcao', 'correção de SA com justificativa');
-select testes.igual((public.complete_movement(:'me1') ->> 'status'), 'concluida', 'ME concluída');
+select testes.falha(format($$select public.complete_movement('%s')$$, :'me1'), 'não permite confirmar a baixa no ERP');
+commit;
+
+-- Almoxarife faz a baixa no ERP com a SA e confirma (somente no estoque dele)
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a2', true);
+select testes.falha(format($$select public.complete_movement('%s')$$, :'me1'), 'ME não encontrada');
+select testes.falha(format($$select public.complete_movement('%s')$$, :'me2'), 'aguardando baixa no ERP');
+commit;
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+select testes.igual((public.complete_movement(:'me1', 'DOC-ERP-778', 'Baixa feita') ->> 'status'), 'concluida', 'almoxarife confirma baixa no ERP');
+select testes.igual((select reason from public.movement_status_history where movement_id = :'me1' and to_status = 'concluida' order by id desc limit 1),
+                    'Baixa realizada no ERP com a SA SA-2026-0009. Documento ERP: DOC-ERP-778. Obs.: Baixa feita', 'histórico registra SA e documento do ERP');
+select testes.igual((select completed_by::text from public.stock_movements where id = :'me1'), '00000000-0000-0000-0000-0000000000a1', 'conclusão registrada no almoxarife');
+commit;
+
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b1', true);
 select testes.falha(format($$select public.inform_sa('%s', 'SA-2026-0010', 'Ajuste após conclusão')$$, :'me1'), 'Somente gestor');
 select testes.falha(format($$select public.cancel_movement('%s', 'Teste de cancelamento')$$, :'me2'), 'não permite cancelar');
 commit;
@@ -227,9 +248,9 @@ select testes.falha(format($$select public.correct_movement('%s', '{"notes":"Aju
 select public.correct_movement(:'me1', '{"notes":"Ajuste administrativo"}', 'Observação incompleta no registro');
 select testes.igual((select notes from public.stock_movements where id = :'me1'), 'Ajuste administrativo', 'correção de ME concluída pelo gestor');
 
-select testes.igual((select count(*) from public.audit_logs where movement_id = :'me1' and action like 'sa.%')::int >= 3, true, 'auditoria registra SA (inclusão e correções)');
-select testes.igual((select count(*) from public.audit_logs where movement_id = :'me1' and action = 'item.incluido')::int, 2, 'auditoria registra inclusão de itens');
-select testes.igual((select count(*) from public.audit_logs where movement_id = :'me1' and action = 'me.corrigida' and justification is not null)::int >= 1, true, 'auditoria registra justificativa');
+select testes.igual((select count(*) from jsonb_array_elements(public.movement_audit(:'me1')) e where e ->> 'action' like 'sa.%')::int >= 3, true, 'auditoria registra SA (inclusão e correções)');
+select testes.igual((select count(*) from jsonb_array_elements(public.movement_audit(:'me1')) e where e ->> 'action' = 'item.incluido')::int, 2, 'auditoria registra inclusão de itens');
+select testes.igual((select count(*) from jsonb_array_elements(public.movement_audit(:'me1')) e where e ->> 'action' = 'me.corrigida' and e ->> 'justification' is not null)::int >= 1, true, 'auditoria registra justificativa');
 select testes.igual((select count(*) from public.movement_status_history where movement_id = :'me1')::int, 3, 'histórico de status (aguardando_sa > sa_informada > concluida)');
 select testes.falha($$update public.audit_logs set action = 'x'$$, 'permission denied');
 select testes.falha($$delete from public.audit_logs$$, 'permission denied');
@@ -245,7 +266,8 @@ select testes.igual((public.search_movements('{"q":"Silva"}', 1, 25) ->> 'total'
 select testes.igual((public.search_movements(format('{"date_from":"%s","date_to":"%s"}', current_date - 1, current_date + 1)::jsonb, 1, 25) ->> 'total')::int, 2, 'filtro por período');
 select testes.igual(jsonb_array_length(public.export_movements('{}', 'itens')), 3, 'exportação detalhada por item');
 select testes.igual(jsonb_array_length(public.export_movements(format('{"warehouse_id":"%s"}', :'mur')::jsonb, 'resumo')), 1, 'exportação respeita filtro');
-select testes.igual((select count(*) from public.audit_logs)::int > 0, true, 'gestor lê auditoria dos seus estoques');
+select testes.igual((public.search_audit('{}', 1, 50) ->> 'total')::int > 0, true, 'gestor lê auditoria dos seus estoques');
+select testes.falha($$select count(*) from public.audit_logs$$, 'permission denied');
 commit;
 
 -- Almoxarife não exporta
@@ -253,7 +275,8 @@ begin;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
 select testes.falha($$select public.export_movements('{}', 'resumo')$$, 'não permite exportar');
-select testes.igual((select count(*) from public.audit_logs)::int, 0, 'almoxarife não lê auditoria');
+select testes.falha($$select public.search_audit('{}', 1, 50)$$, 'não permite consultar');
+select testes.igual(jsonb_array_length(public.movement_audit(:'me1')), 0, 'almoxarife não lê histórico de auditoria');
 commit;
 
 -- Mesmo como dono do banco a exclusão física é bloqueada

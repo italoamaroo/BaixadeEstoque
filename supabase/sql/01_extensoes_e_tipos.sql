@@ -9,7 +9,7 @@ create extension if not exists pg_trgm with schema extensions;
 
 -- Perfis de acesso
 do $$ begin
-  create type public.app_role as enum ('almoxarife', 'equipe_sa', 'gestor', 'admin');
+  create type public.app_role as enum ('almoxarife', 'equipe_sa', 'gestor', 'admin', 'terminal');
 exception when duplicate_object then null; end $$;
 
 -- Status da ME (Movimentação de Estoque)

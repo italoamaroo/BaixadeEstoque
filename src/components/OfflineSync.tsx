@@ -18,7 +18,7 @@ import { fmtDateTime } from '@/lib/format';
 export function OfflineSync() {
   const { userId, settings, can } = useAuth();
   const online = useOnlineStatus();
-  const { items } = useOfflineQueue();
+  const { items, error } = useOfflineQueue();
   const enabled = Boolean(userId) && can('createMovement');
   const running = useRef(false);
 
@@ -36,6 +36,8 @@ export function OfflineSync() {
       if (r.failed.length) {
         toast.error(`${r.failed.length} saída(s) guardada(s) não puderam ser enviadas. Veja em "Saídas offline".`, { duration: 10000 });
       }
+    } catch {
+      // Mantém a rotina de sincronização ativa para a próxima tentativa.
     } finally {
       running.current = false;
     }
@@ -54,7 +56,10 @@ export function OfflineSync() {
     return () => clearInterval(t);
   }, [enabled, online, run, items.length]);
 
-  if (!enabled || items.length === 0) return null;
+  if (!enabled || (!error && items.length === 0)) return null;
+  if (error) {
+    return <Link to="/saidas-offline" className="block bg-red-600 px-4 py-2 text-center text-sm font-semibold text-white print:hidden">Não foi possível consultar as saídas guardadas neste aparelho</Link>;
+  }
   const errors = items.filter((i) => i.status === 'erro').length;
   return (
     <Link

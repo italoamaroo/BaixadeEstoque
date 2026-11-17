@@ -155,7 +155,7 @@ grant execute on function
   public.search_movements(jsonb, int, int, text, text),
   public.find_material_by_code(text), public.search_materials(text, boolean, int),
   public.create_movement(jsonb), public.approve_movement(uuid, text),
-  public.inform_sa(uuid, text, text), public.complete_movement(uuid),
+  public.inform_sa(uuid, text, text), public.complete_movement(uuid, text, text),
   public.cancel_movement(uuid, text), public.correct_movement(uuid, jsonb, text),
   public.replace_signature(uuid, text, uuid, text), public.log_event(text, uuid, jsonb),
   public.export_movements(jsonb, text), public.dashboard_stats(jsonb),

@@ -4,7 +4,7 @@ import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const dir = join(process.cwd(), 'supabase', 'sql');
-const files = readdirSync(dir).filter((f) => /^0[1-8]_.*\.sql$/.test(f)).sort();
+const files = readdirSync(dir).filter((f) => /^0[1-8][bcdefghi]?_.*\.sql$/.test(f)).sort();
 const header = `-- =====================================================================
 -- INSTALAÇÃO COMPLETA (gerado por scripts/montar-sql.mjs — não edite à mão)
 -- Arquivos: ${files.join(', ')}
@@ -13,5 +13,13 @@ const header = `-- =============================================================
 set client_min_messages = warning;
 `;
 const body = files.map((f) => `\n-- >>>>>>>>>> ${f}\n${readFileSync(join(dir, f), 'utf8')}`).join('\n');
-writeFileSync(join(process.cwd(), 'supabase', 'instalar_completo.sql'), header + body);
+const output = join(process.cwd(), 'supabase', 'instalar_completo.sql');
+if (process.argv.includes('--check')) {
+  if (readFileSync(output, 'utf8') !== header + body) {
+    console.error('SQL consolidado desatualizado. Execute npm run sql:montar.');
+    process.exit(1);
+  }
+} else {
+  writeFileSync(output, header + body);
+}
 console.log(`supabase/instalar_completo.sql gerado com ${files.length} arquivos.`);

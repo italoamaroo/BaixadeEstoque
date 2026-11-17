@@ -17,7 +17,10 @@
     "sql:montar": "node scripts/montar-sql.mjs",
     "demo:seed": "node scripts/demo-seed.mjs",
     "demo:clean": "node scripts/demo-clean-storage.mjs",
-    "test:sql": "bash supabase/tests/executar_testes_sql.sh"
+    "test:sql": "bash supabase/tests/executar_testes_sql.sh",
+    "check:structure": "node scripts/check-structure.mjs",
+    "sql:check": "node scripts/montar-sql.mjs --check",
+    "check": "npm run check:structure && npm run sql:check && npm test && npm run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
