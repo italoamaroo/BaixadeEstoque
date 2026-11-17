@@ -13,12 +13,7 @@ createRoot(document.getElementById('root')!).render(
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('/sw.js')
-      .then(() => navigator.serviceWorker.ready)
-      .then((reg) => {
-        // a cada abertura com internet, guarda a versão nova do app (só baixa se mudou)
-        if (navigator.onLine) reg.active?.postMessage('atualizar-app');
-      })
+      .register('/sw.js', { updateViaCache: 'none' })
       .catch(() => undefined);
   });
 }
