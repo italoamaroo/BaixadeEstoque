@@ -365,3 +365,23 @@ de produção e não publica o sistema. Configure esses checks como obrigatório
 se desejar impedir merges com falhas; a criação do workflow, sozinha, não altera essa regra.
 
 Consulte [estrutura, conferência do banco e migrações](docs/ESTRUTURA_E_BANCO.md).
+
+
+## Consulta de MEs emergenciais
+
+O menu **Emergenciais** (`/emergenciais`) reúne as MEs marcadas como emergenciais,
+com a mesma permissão de consulta de Movimentações e o estoque selecionado no topo.
+A tela mantém o recorte de emergenciais mesmo ao limpar filtros ou abrir um endereço
+com outro tipo de ME. Inclui busca, período, material, requisitante, ativo, status,
+paginação, motivo da emergência e acesso ao detalhe/quantidades e impressão da ME.
+O total mostrado corresponde a todos os registros encontrados com os filtros aplicados,
+não apenas à página atual; use o filtro de status para separar canceladas ou em andamento.
+
+**Exportar Excel/PDF** abre a exportação existente com os mesmos filtros. Assinaturas
+e fotos continuam acessíveis pelo detalhe, conforme as permissões existentes.
+Gestores e administradores com permissão de alertas veem a comparação de retiradas
+repetidas por ativo e material, em janelas de 7, 15 ou 30 dias. A comparação inclui
+retiradas anteriores normais; a ME mais recente considerada precisa ser emergencial
+e atender aos filtros da tela.
+
+Não é necessária migração SQL: a consulta usa `is_emergency` e as funções existentes.

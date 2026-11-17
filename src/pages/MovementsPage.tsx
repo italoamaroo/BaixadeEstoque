@@ -16,6 +16,7 @@ import { filtersFromSearchParams, filtersToSearchParams, type MovementFilters } 
 import { fmtDate, fmtDateTime, fmtTime } from '@/lib/format';
 import { useRealtimeMovements } from '@/hooks/useRealtimeMovements';
 import { useHeaderWarehouseFilter } from '@/hooks/useHeaderWarehouseFilter';
+import { EmergencyRepeatWithdrawals } from '@/components/EmergencyRepeatWithdrawals';
 import type { MovementRow } from '@/types/db';
 
 const SORTABLE: Record<string, string> = {
@@ -30,12 +31,15 @@ const SORTABLE: Record<string, string> = {
   updated_at: 'Última alteração',
 };
 
-export function MovementsPage() {
+export function MovementsPage({ emergencyOnly = false }: { emergencyOnly?: boolean }) {
   const { can } = useAuth();
   const navigate = useNavigate();
   useHeaderWarehouseFilter();
   const [params, setParams] = useSearchParams();
-  const filters = useMemo(() => filtersFromSearchParams(params), [params]);
+  const filters = useMemo(() => {
+    const parsed = filtersFromSearchParams(params);
+    return emergencyOnly ? { ...parsed, emergency: 'sim' as const, pending_sa: false, sa_number: '' } : parsed;
+  }, [params, emergencyOnly]);
   const page = Number(params.get('pagina') ?? 1) || 1;
   const pageSize = Number(params.get('por_pagina') ?? 25) || 25;
   const sort = params.get('ordem') ?? 'movement_at';
@@ -65,12 +69,13 @@ export function MovementsPage() {
 
   useEffect(() => {
     void load();
+    return () => { seq.current++; };
   }, [load]);
 
   useRealtimeMovements(() => void load());
 
   const setQuery = (f: MovementFilters, extra: Record<string, string> = {}) => {
-    const p = filtersToSearchParams(f);
+    const p = filtersToSearchParams(emergencyOnly ? { ...f, emergency: 'sim', pending_sa: false, sa_number: '' } : f);
     const merged: Record<string, string> = { ordem: sort, dir, por_pagina: String(pageSize), ...extra };
     for (const [k, v] of Object.entries(merged)) p.set(k, v);
     setParams(p, { replace: true });
@@ -105,13 +110,13 @@ export function MovementsPage() {
   return (
     <div>
       <PageHeader
-        title="Movimentações"
-        subtitle="Todas as MEs dos estoques que você pode consultar."
+        title={emergencyOnly ? 'Emergenciais' : 'Movimentações'}
+        subtitle={emergencyOnly ? 'MEs emergenciais para controle: consulte os materiais retirados e o motivo de cada saída.' : 'Todas as MEs dos estoques que você pode consultar.'}
         actions={
           <>
             {can('exportExcel') && (
               <LinkButton to={exportHref} variant="secondary" icon={<FileSpreadsheet className="h-4 w-4" />}>
-                Exportar Excel
+                Exportar Excel/PDF
               </LinkButton>
             )}
             {can('createMovement') && (
@@ -123,7 +128,15 @@ export function MovementsPage() {
         }
       />
 
-      <FiltersPanel value={filters} onApply={(f) => setQuery(f, { pagina: '1' })} />
+      <FiltersPanel emergencyOnly={emergencyOnly} value={filters} onApply={(f) => setQuery(f, { pagina: '1' })} />
+
+      {emergencyOnly && (
+        <div className="mt-4 space-y-4">
+          <Alert tone="warning">Saídas emergenciais não exigem SA nem baixa no ERP. Consulte os detalhes da ME para ver quantidades, assinatura e evidências autorizadas.</Alert>
+          {!loading && !error && data && <p className="text-sm font-semibold text-slate-700">{data.total.toLocaleString('pt-BR')} {data.total === 1 ? 'ME emergencial encontrada' : 'MEs emergenciais encontradas'}</p>}
+          <EmergencyRepeatWithdrawals filters={filters} />
+        </div>
+      )}
 
       <div className="mt-4 rounded-xl border border-slate-200 bg-white shadow-card">
         {error && (
@@ -134,7 +147,7 @@ export function MovementsPage() {
         {loading && !data ? (
           <PageLoader />
         ) : data && data.rows.length === 0 ? (
-          <EmptyState icon={<ClipboardList className="h-10 w-10" />} title="Nenhuma ME encontrada" description="Ajuste os filtros ou o período da consulta." />
+          <EmptyState icon={<ClipboardList className="h-10 w-10" />} title={emergencyOnly ? 'Nenhuma ME emergencial encontrada' : 'Nenhuma ME encontrada'} description="Ajuste os filtros ou o período da consulta." />
         ) : data ? (
           <>
             {/* Desktop */}
@@ -150,7 +163,12 @@ export function MovementsPage() {
                     <SortHeader k="requester_name" />
                     <SortHeader k="sector_name" />
                     <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Frente / OS</th>
-                    <SortHeader k="sa_number" />
+                    {emergencyOnly ? (
+                      <>
+                        <th scope="col" className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Ativo fixo</th>
+                        <th scope="col" className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Motivo da emergência</th>
+                      </>
+                    ) : <SortHeader k="sa_number" />}
                     <SortHeader k="status" />
                     <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Responsável</th>
                     <SortHeader k="updated_at" />
@@ -182,7 +200,12 @@ export function MovementsPage() {
                         {m.service_front_name ?? '—'}
                         {m.service_order ? <span className="block text-xs">OS {m.service_order}</span> : null}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs">{m.sa_number ?? '—'}</td>
+                      {emergencyOnly ? (
+                        <>
+                          <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs">{m.fixed_asset ?? '—'}</td>
+                          <td className="min-w-[180px] max-w-[280px] whitespace-normal break-words px-3 py-2.5 text-slate-600">{m.emergency_reason ?? '—'}</td>
+                        </>
+                      ) : <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs">{m.sa_number ?? '—'}</td>}
                       <td className="px-3 py-2.5">
                         <StatusBadge status={m.status} emergency={m.is_emergency} />
                       </td>
@@ -196,7 +219,7 @@ export function MovementsPage() {
                           <button type="button" title="Visualizar" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand-700" onClick={() => navigate(`/movimentacoes/${m.id}`)}>
                             <Eye className="h-4 w-4" />
                           </button>
-                          {can('informSa') && (m.status === 'aguardando_sa' || (m.status === 'sa_informada' && m.sa_number)) && (
+                          {!emergencyOnly && can('informSa') && (m.status === 'aguardando_sa' || (m.status === 'sa_informada' && m.sa_number)) && (
                             <button type="button" title={m.sa_number ? 'Corrigir SA' : 'Informar SA'} className="rounded-md p-1.5 text-orange-600 hover:bg-orange-50" onClick={() => setSaTarget(m)}>
                               <Hourglass className="h-4 w-4" />
                             </button>
@@ -223,6 +246,10 @@ export function MovementsPage() {
                     </div>
                     <p className="mt-1 text-sm text-slate-900">{m.requester_name}</p>
                     <p className="truncate text-xs text-slate-500">{m.materials_summary}</p>
+                    {emergencyOnly && <>
+                      <p className="mt-1 text-xs text-slate-600">Ativo fixo: {m.fixed_asset ?? 'Não informado'}</p>
+                      <p className="mt-1 break-words text-sm text-slate-700"><span className="font-semibold">Motivo:</span> {m.emergency_reason ?? 'Não informado'}</p>
+                    </>}
                     <p className="mt-1 text-xs text-slate-500">
                       {fmtDateTime(m.movement_at)} · {m.warehouse_name} · {m.item_count} {m.item_count === 1 ? 'item' : 'itens'}
                       {m.sa_number ? ` · SA ${m.sa_number}` : ''}
