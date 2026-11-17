@@ -51,6 +51,7 @@ export function FaceScanner({
   timeoutMs = 20000,
   onResult,
   onUnavailable,
+  onTimeout,
   className,
 }: {
   samplesNeeded?: number;
@@ -58,6 +59,7 @@ export function FaceScanner({
   timeoutMs?: number;
   onResult: (r: FaceScanResult) => void;
   onUnavailable?: (reason: string) => void;
+  onTimeout?: () => void;
   className?: string;
 }) {
   const video = useRef<HTMLVideoElement>(null);
@@ -70,6 +72,8 @@ export function FaceScanner({
   done.current = onResult;
   const unavailable = useRef(onUnavailable);
   unavailable.current = onUnavailable;
+  const timeout = useRef(onTimeout);
+  timeout.current = onTimeout;
 
   useEffect(() => {
     let alive = true;
@@ -108,6 +112,7 @@ export function FaceScanner({
             setBox(null);
             setHint('Não consegui ler o rosto a tempo.');
             stream.getTracks().forEach((t) => t.stop());
+            timeout.current?.();
             return;
           }
           const r = v.readyState >= 2 ? await detectFace(v).catch(() => null) : null;
