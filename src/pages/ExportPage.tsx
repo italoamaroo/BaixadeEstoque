@@ -155,7 +155,7 @@ export function ExportPage() {
       <Card>
         <CardHeader
           title="PDF com itens e assinaturas"
-          subtitle={`Uma página por ME com cabeçalho, materiais e a assinatura digital de quem recebeu. Usa os mesmos filtros acima (até ${PDF_LIMIT} MEs por arquivo).`}
+          subtitle={`Formulário de Movimentação de Estoque, com logo, materiais e assinatura de recebimento, sem capa. MEs extensas continuam nas páginas seguintes. Usa os mesmos filtros acima (até ${PDF_LIMIT} MEs por arquivo).`}
         />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-slate-600">
