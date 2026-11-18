@@ -25,7 +25,6 @@ export function MovementPrint({ detail, signatureUrl, companyName }: Props) {
           <tr>
             <td className={`${cell} w-[28%]`}>
               <img src="/logo-consorcio.png" alt={companyName} className="mb-1 h-11 w-auto" />
-              <span className="text-sm font-bold">{companyName}</span>
               <span className="block text-[10px]">Almoxarifado {m.warehouse_name}</span>
             </td>
             <td className={`${cell} text-center`}>
@@ -80,7 +79,7 @@ export function MovementPrint({ detail, signatureUrl, companyName }: Props) {
 
       <table className="mt-[-1px] w-full border-collapse">
         <thead>
-          <tr className="bg-slate-100">
+          <tr>
             {['Item', 'Referência', 'Nome do material', 'Unid.', 'Qtd. sol.', 'Qtd. atd.', 'Localiz.', 'Conta'].map((h) => (
               <th key={h} className={`${cell} text-center text-[9px] font-semibold uppercase`}>
                 {h}
