@@ -102,18 +102,11 @@ export async function fetchPdfData(filters: Partial<MovementFilters>, onProgress
   return { rows, total, truncated: total > list.length };
 }
 
-const BRAND: [number, number, number] = [29, 67, 196];
-
-/** A fonte padrão do PDF não tem alguns símbolos (ex.: m³); troca por equivalentes legíveis. */
-function clean<T>(v: T): T {
-  if (typeof v !== 'string') return v;
-  return v.replace(/²/g, '2').replace(/³/g, '3').replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"') as T;
-}
-function cleanRows(rows: unknown[][]): never[] {
-  return rows.map((r) => r.map((c) => (typeof c === 'object' && c !== null && 'content' in c ? { ...(c as object), content: clean((c as { content: string }).content) } : clean(c)))) as never[];
+/** Mantém texto compatível com a fonte padrão do PDF. */
+function clean(v: string): string {
+  return v.replace(/²/g, '2').replace(/³/g, '3').replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
 }
 
-/** Gera o PDF: uma seção por ME com cabeçalho, itens e assinatura de quem recebeu. */
 /** Logo do consórcio (public/logo-consorcio.png) como data URL; sem logo, o relatório sai sem ela. */
 async function loadLogo(): Promise<string | null> {
   try {
@@ -131,189 +124,130 @@ async function loadLogo(): Promise<string | null> {
   }
 }
 
+/** Formulário oficial, sem capa: uma ME por página, com continuação para itens longos. */
 export async function buildMovementsPdf(
   data: PdfMovement[],
-  opts: { filterLines: string[]; generatedBy: string; companyName: string; total: number; truncated: boolean },
+  _opts: { filterLines: string[]; generatedBy: string; companyName: string; total: number; truncated: boolean },
 ): Promise<Blob> {
   const { jsPDF } = await import('jspdf');
   const { autoTable } = await import('jspdf-autotable');
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-  const W = doc.internal.pageSize.getWidth();
-  const H = doc.internal.pageSize.getHeight();
-  const M = 12;
-  const lastY = () => (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
-
-  // ---------- Capa / resumo ----------
-  doc.setFillColor(...BRAND);
-  doc.rect(0, 0, W, 28, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.text('Relatório de Movimentações de Estoque', M, 13);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text(`${opts.companyName} · MEs com itens e assinatura de recebimento`, M, 21);
-  doc.setTextColor(30, 41, 59);
-  // logo do consórcio no canto direito da faixa
   const logo = await loadLogo();
-  if (logo) {
-    doc.setFillColor(255, 255, 255);
-    doc.roundedRect(W - M - 44, 3, 44, 22, 2, 2, 'F');
-    doc.addImage(logo, 'PNG', W - M - 42, 4.6, 40, 19.2);
-  }
+  const M = 7;
+  const width = 196;
+  const third = width / 3;
+  const generatedAt = fmtDateTime(new Date());
+  doc.setLineWidth(0.2);
+  doc.setDrawColor(0);
+  doc.setTextColor(0);
 
-  let y = 38;
-  doc.setFontSize(10);
-  const info = [
-    `Gerado em: ${fmtDateTime(new Date())}`,
-    `Gerado por: ${opts.generatedBy}`,
-    `MEs no relatório: ${data.length}${opts.truncated ? ` (de ${opts.total} encontradas; limite de ${PDF_LIMIT} por arquivo — refine os filtros)` : ''}`,
-    ...opts.filterLines,
-  ];
-  for (const line of info) {
-    doc.text(doc.splitTextToSize(line, W - 2 * M), M, y);
-    y += 6;
-  }
-
-  autoTable(doc, {
-    startY: y + 2,
-    head: [['Nº da ME', 'Data', 'Estoque', 'Requisitante', 'Itens', 'SA', 'Status']],
-    body: cleanRows(data.map(({ movement: m }) => [
-      m.me_number,
-      fmtDateTime(m.movement_at),
-      m.warehouse_name,
-      m.requester_name,
-      String(m.item_count),
-      m.sa_number ?? '—',
-      STATUS_LABELS[m.status],
-    ])),
-    styles: { fontSize: 8, cellPadding: 1.5 },
-    headStyles: { fillColor: BRAND },
-    margin: { left: M, right: M },
-  });
-
-  // ---------- Uma seção por ME ----------
-  for (const { movement: m, items, signature, signatureDataUrl } of data) {
-    doc.addPage();
-    y = M;
-
-    doc.setFillColor(...BRAND);
-    doc.rect(M, y, W - 2 * M, 11, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text(m.me_number, M + 3, y + 7.3);
+  // Desenha campos com rótulo pequeno e conteúdo quebrado dentro da célula.
+  const field = (x: number, y: number, w: number, h: number, label: string, value: string) => {
+    doc.rect(x, y, w, h);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text(`${m.warehouse_name} · ${fmtDateTime(m.movement_at)} · ${STATUS_LABELS[m.status]}`, W - M - 3, y + 7.3, { align: 'right' });
-    doc.setTextColor(30, 41, 59);
-    y += 14;
+    doc.setFontSize(6);
+    doc.text(label, x + 1.5, y + 3);
+    doc.setFontSize(8);
+    doc.text(doc.splitTextToSize(clean(value), w - 3), x + 1.5, y + 7);
+  };
 
-    autoTable(doc, {
-      startY: y,
-      theme: 'plain',
-      styles: { fontSize: 8.5, cellPadding: 1.2, valign: 'top' },
-      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 30 }, 2: { fontStyle: 'bold', cellWidth: 30 } },
-      body: cleanRows([
-        ['Contrato', `${m.contract_code} – ${m.contract_name}`, 'Setor', m.sector_name],
-        ['Frente/Equip.', m.service_front_name ?? '—', 'Ordem de serviço', m.service_order ?? '—'],
-        ['Ativo fixo', m.fixed_asset ?? '—', 'Local de aplicação', m.application_location ?? '—'],
-        ['Requisitante', `${m.requester_name} (${m.requester_registration})`, 'Almoxarife', m.storekeeper_name ?? '—'],
-        ['Número da SA', m.is_emergency ? 'Não se aplica (emergencial)' : (m.sa_number ?? 'Pendente'), 'SA informada em', m.sa_informed_at ? fmtDateTime(m.sa_informed_at) : '—'],
-        ...(m.notes ? [['Observações', { content: m.notes, colSpan: 3 }]] : []),
-      ]),
-      margin: { left: M, right: M },
-    });
-
-    autoTable(doc, {
-      startY: lastY() + 3,
-      head: [['Item', 'Código', 'Referência', 'Material', 'Un.', 'Qtd. sol.', 'Qtd. atd.', 'Localiz.', 'Conta']],
-      body: cleanRows(items.map((i) => [
-        String(i.line_number),
-        i.material_code,
-        i.material_reference ?? '',
-        i.notes ? `${i.material_name}\nObs.: ${i.notes}` : i.material_name,
-        i.unit,
-        fmtQty(i.quantity_requested),
-        fmtQty(i.quantity_delivered),
-        i.location ?? '',
-        i.account_code ?? '',
-      ])),
-      styles: { fontSize: 8, cellPadding: 1.4 },
-      headStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: 'bold' },
-      columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 5: { halign: 'right' }, 6: { halign: 'right', fontStyle: 'bold' } },
-      margin: { left: M, right: M },
-    });
-
-    // Assinatura
-    y = lastY() + 5;
-    if (y + 42 > H - 14) {
-      doc.addPage();
-      y = M;
+  for (const [index, { movement: m, items, signature, signatureDataUrl }] of data.entries()) {
+    if (index) doc.addPage();
+    const y = 6;
+    doc.rect(M, y, 55, 30);
+    if (logo) {
+      const props = doc.getImageProperties(logo);
+      const scale = Math.min(49 / props.width, 22 / props.height);
+      doc.addImage(logo, props.fileType, M + 2, y + 1, props.width * scale, props.height * scale);
     }
-    doc.setDrawColor(148, 163, 184);
-    doc.rect(M, y, W - 2 * M, 38);
+    doc.setFontSize(7);
+    doc.text(doc.splitTextToSize(`Almoxarifado ${m.warehouse_name}`, 51), M + 2, y + 27);
+    doc.rect(M + 55, y, 67, 30);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text('RECEBIDO POR / ASSINATURA', M + 3, y + 5);
-    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(13);
+    doc.text(['MOVIMENTAÇÃO DE', 'ESTOQUE'], M + 88.5, y + 7, { align: 'center', lineHeightFactor: 1.5 });
+    field(M + 122, y, 32, 30, 'TIPO', `[${m.movement_type === 'saida' ? 'X' : ' '}] SAÍDA\n[${m.movement_type === 'entrada' ? 'X' : ' '}] ENTRADA`);
+    field(M + 154, y, 42, 30, 'ME Nº', m.me_number);
+    doc.setFontSize(6);
+    doc.text('DATA', M + 155.5, y + 13);
+    doc.setFontSize(8);
+    doc.text(fmtDateTime(m.movement_at), M + 155.5, y + 17);
 
+    field(M, 36, third, 10, 'CONTRATO', `${m.contract_code} - ${m.contract_name}`);
+    field(M + third, 36, third, 10, 'SETOR', m.sector_name);
+    field(M + third * 2, 36, third, 10, 'FRENTE DE SERVIÇO / EQUIPAMENTO', m.service_front_name ?? '--');
+    field(M, 46, third, 10, 'ORDEM DE SERVIÇO', m.service_order ?? '');
+    field(M + third, 46, third, 10, 'ATIVO FIXO (AF)', m.fixed_asset ?? '');
+    field(M + third * 2, 46, third, 10, 'LOCAL APLICAÇÃO', m.application_location ?? '-');
+
+    const rows = items.map((i) => [
+      String(i.line_number),
+      [i.material_reference, i.material_code].filter(Boolean).join('\n'),
+      i.notes ? `${i.material_name}\nObs.: ${i.notes}` : i.material_name,
+      i.unit, fmtQty(i.quantity_requested), fmtQty(i.quantity_delivered), i.location ?? '', i.account_code ?? '',
+    ].map(clean));
+    while (rows.length < 8) rows.push(Array(8).fill(''));
+    autoTable(doc, {
+      startY: 56,
+      theme: 'grid',
+      head: [['ITEM', 'REFERÊNCIA', 'NOME DO MATERIAL', 'UNID.', 'QTD. SOL.', 'QTD. ATD.', 'LOCALIZ.', 'CONTA']],
+      body: rows,
+      styles: { font: 'helvetica', fontSize: 7, cellPadding: 1, minCellHeight: 5.5, lineWidth: 0.2, lineColor: 0, textColor: 0, overflow: 'linebreak' },
+      headStyles: { fillColor: 255, textColor: 0, fontSize: 6, halign: 'center', fontStyle: 'bold' },
+      columnStyles: { 0: { cellWidth: 15, halign: 'center' }, 1: { cellWidth: 29 }, 2: { cellWidth: 44 }, 3: { cellWidth: 16, halign: 'center' }, 4: { cellWidth: 25, halign: 'right' }, 5: { cellWidth: 24, halign: 'right' }, 6: { cellWidth: 24 }, 7: { cellWidth: 19 } },
+      margin: { left: M, right: M, top: 10, bottom: 12 },
+      rowPageBreak: 'avoid',
+    });
+    let bottom = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+    const notes = m.notes ? doc.splitTextToSize(clean(`Observações: ${m.notes}`), width) : [];
+    const cancelled = m.status === 'cancelada'
+      ? doc.splitTextToSize(clean(`CANCELADA em ${fmtDateTime(m.cancelled_at)} por ${m.cancelled_by_name ?? '-'}: ${m.cancel_reason ?? ''}`), width) : [];
+    if (bottom + 49 + (notes.length + cancelled.length) * 4 > 285) {
+      doc.addPage();
+      bottom = 10;
+      doc.setFontSize(8);
+      doc.text(`${m.me_number} - continuação`, M, 7);
+    }
+    field(M, bottom, third, 31, 'REQUISITANTE / DATA', `${m.requester_name}\n(${m.requester_registration})\n${fmtDateTime(m.requested_at)}`);
+    field(M + third, bottom, third, 31, 'APROVADO / DATA', m.approved_by_name
+      ? `${m.approved_by_name}\n${fmtDateTime(m.approved_at)}`
+      : `Baixa: ${m.storekeeper_name ?? ''}\n${fmtDateTime(m.created_at)}`);
+    const sx = M + third * 2;
+    field(sx, bottom, third, 31, 'RECEBIDO / DATA', '');
     if (signatureDataUrl) {
       try {
         const props = doc.getImageProperties(signatureDataUrl);
-        const maxW = 80;
-        const maxH = 22;
-        const ratio = Math.min(maxW / props.width, maxH / props.height);
-        const w = props.width * ratio;
-        const h = props.height * ratio;
-        doc.addImage(signatureDataUrl, props.fileType || 'PNG', M + 3, y + 7 + (maxH - h) / 2, w, h);
+        const scale = Math.min((third - 4) / props.width, 14 / props.height);
+        const w = props.width * scale;
+        doc.addImage(signatureDataUrl, props.fileType, sx + (third - w) / 2, bottom + 4, w, props.height * scale);
       } catch {
-        doc.text('[assinatura não pôde ser exibida]', M + 3, y + 18);
+        doc.setFontSize(6);
+        doc.text('Imagem da assinatura indisponível', sx + 2, bottom + 12);
       }
-    } else {
-      doc.setTextColor(185, 28, 28);
-      doc.text(signature ? '[imagem da assinatura indisponível]' : '[sem assinatura registrada]', M + 3, y + 18);
-      doc.setTextColor(30, 41, 59);
+    } else if (signature) {
+      doc.setFontSize(6);
+      doc.text('Imagem da assinatura indisponível', sx + 2, bottom + 12);
     }
-    doc.line(M + 3, y + 31, M + 90, y + 31);
-    doc.setFontSize(8.5);
-    const signer = signature
-      ? `${signature.signer_name} (${signature.signer_registration}) · assinado em ${fmtDateTime(signature.signed_at)}`
-      : `${m.received_by_name ?? m.requester_name}`;
-    doc.text(clean(signer), M + 3, y + 35);
-    doc.setFontSize(7.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text(
-      doc.splitTextToSize(`Documento gerado eletronicamente. Identificador da ME: ${m.id}`, 85),
-      W - M - 3,
-      y + 30,
-      { align: 'right' },
-    );
-    doc.setTextColor(30, 41, 59);
-
-    if (m.status === 'cancelada') {
-      doc.setTextColor(185, 28, 28);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.text(
-        doc.splitTextToSize(`ME CANCELADA em ${fmtDateTime(m.cancelled_at)} por ${m.cancelled_by_name ?? '—'}: ${m.cancel_reason ?? ''}`, W - 2 * M),
-        M,
-        y + 44,
-      );
-      doc.setTextColor(30, 41, 59);
-      doc.setFont('helvetica', 'normal');
+    doc.line(sx + 2, bottom + 20, sx + third - 2, bottom + 20);
+    doc.setFontSize(7);
+    const receiver = `${signature?.signer_name ?? m.received_by_name ?? ''}\n(${signature?.signer_registration ?? m.received_by_registration ?? ''}) - ${fmtDateTime(signature?.signed_at ?? m.received_at)}`;
+    doc.text(doc.splitTextToSize(clean(receiver), third - 4), sx + 2, bottom + 24);
+    bottom += 36;
+    doc.setFontSize(7);
+    doc.text(`Status: ${STATUS_LABELS[m.status]}`, M, bottom);
+    doc.text(m.is_emergency ? 'ME EMERGENCIAL (só controle)' : `SA: ${m.sa_number ?? 'pendente'}`, M + width, bottom, { align: 'right' });
+    for (const line of [...notes, ...cancelled]) {
+      bottom += 4;
+      if (bottom > 278) {
+        doc.addPage();
+        bottom = 14;
+        doc.setFontSize(7);
+        doc.text(`${m.me_number} - continuação`, M, 7);
+      }
+      doc.text(line, M, bottom);
     }
+    doc.setFontSize(6);
+    doc.text(`Documento gerado eletronicamente em ${generatedAt}. Identificador: ${m.id}`, M, bottom + 6);
   }
-
-  // Rodapé com paginação
-  const pages = doc.getNumberOfPages();
-  for (let p = 1; p <= pages; p++) {
-    doc.setPage(p);
-    doc.setFontSize(7.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text(`${opts.companyName} · Baixas de Estoque`, M, H - 6);
-    doc.text(`Página ${p} de ${pages}`, W - M, H - 6, { align: 'right' });
-  }
-
   return doc.output('blob');
 }
