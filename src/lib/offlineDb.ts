@@ -54,5 +54,6 @@ export async function kvClearPrefix(prefix: string) {
 }
 
 export const queueAll = <T>() => tx<T[]>('queue', 'readonly', (s) => s.getAll() as IDBRequest<T[]>);
+export const queueAdd = (value: unknown) => tx('queue', 'readwrite', (s) => s.add(value)).then(() => undefined);
 export const queuePut = (value: unknown) => tx('queue', 'readwrite', (s) => s.put(value)).then(() => undefined);
 export const queueDel = (id: string) => tx('queue', 'readwrite', (s) => s.delete(id)).then(() => undefined);

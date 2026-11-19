@@ -25,6 +25,11 @@ A guarda de MEs e comprovantes por 10 anos desde conclusão/cancelamento usa
 `supabase/sql/28_retencao_mes.sql`, após a migração 27. O prazo é consultável na
 ME e em Segurança; não há exclusão automática. Ver `docs/CORRECOES_LGPD.md`.
 
+A guarda adicional usa `supabase/sql/29_retencao_adicional.sql`, após a 28.
+Cadastros faciais, logs e fila offline pendente: 10 anos desde criação.
+Backups exigem geração e armazenamento externo configurado; a migração não ativa
+backup nem altera o provedor. Instruções: [`docs/RETENCAO_ADICIONAL.md`](docs/RETENCAO_ADICIONAL.md).
+
 ## 1. Visão geral
 
 | Perfil | O que faz |

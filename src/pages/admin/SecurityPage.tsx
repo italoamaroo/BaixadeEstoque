@@ -1,3 +1,4 @@
+import { AdditionalRetentionCard } from '@/components/AdditionalRetentionCard';
 import { MovementRetentionCard } from '@/components/MovementRetentionCard';
 import { AdminMfaGate } from '@/components/AdminMfaGate';
 import { useCallback, useEffect, useState } from 'react';
@@ -149,6 +150,7 @@ function SecurityContent() {
       </Card>
 
       <MovementRetentionCard />
+      {admin && <AdditionalRetentionCard />}
 
       {tabs.length > 1 && (
         <div role="tablist" className="flex flex-wrap gap-1 border-b border-slate-200">
@@ -330,9 +332,8 @@ function RetentionTab({ policies, onChanged }: { policies: RetentionPolicy[]; on
 
   return (
     <div className="space-y-3">
-      <Alert tone="warning" title="Os prazos vêm como PROPOSTA">
-        Nenhum evento é descartado automaticamente. Os prazos sugeridos precisam ser validados com o jurídico e a contabilidade e depois aprovados aqui. Incidentes
-        exigem no mínimo 5 anos. Qualquer alteração volta o prazo para “proposta”.
+      <Alert tone="warning" title="Guarda adicional de 10 anos">
+        A migração 29 aplica o piso de 10 anos civis desde o registro do evento, inclusive se uma proposta abaixo indicar menos dias. Os alertas legados usam dias; 3650 dias não substituem o cálculo em anos civis. Nenhum evento é descartado automaticamente. Alterações de proposta continuam exigindo aprovação.
       </Alert>
       <Card padded={false}>
         <div className="overflow-x-auto">

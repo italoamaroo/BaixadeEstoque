@@ -1,6 +1,7 @@
+import { canReviewLocalRetention } from './retention';
 import { createMovement, uploadSignature } from './api';
 import { errorMessage, isNetworkError } from './errors';
-import { queueAll, queueDel, queuePut } from './offlineDb';
+import { queueAdd, queueAll, queueDel, queuePut } from './offlineDb';
 import { buildSignaturePath, dataUrlToBlob } from './signature';
 
 /**
@@ -33,7 +34,8 @@ export const QUEUE_EVENT = 'baixas-offline-queue';
 const notify = () => window.dispatchEvent(new CustomEvent(QUEUE_EVENT));
 
 export async function enqueueMovement(q: Omit<QueuedMovement, 'status' | 'attempts' | 'last_error' | 'last_attempt_at' | 'signature_path'>) {
-  await queuePut({ ...q, status: 'pendente', attempts: 0, last_error: null, last_attempt_at: null, signature_path: null });
+  // add é atômico: uma segunda gravação do mesmo ID não reinicia a criação.
+  await queueAdd({ ...q, saved_at: new Date().toISOString(), status: 'pendente', attempts: 0, last_error: null, last_attempt_at: null, signature_path: null });
   notify();
 }
 
@@ -44,6 +46,11 @@ export async function listQueued(userId: string | null): Promise<QueuedMovement[
 }
 
 export async function discardQueued(id: string) {
+  const item = (await queueAll<QueuedMovement>()).find((q) => q.id === id);
+  if (!item) return;
+  if (!canReviewLocalRetention(item.saved_at)) {
+    throw new Error('Guarda de 10 anos desde a criação: envie a saída para preservar o registro junto da ME. Data ausente ou inválida exige conferência.');
+  }
   await queueDel(id);
   notify();
 }
