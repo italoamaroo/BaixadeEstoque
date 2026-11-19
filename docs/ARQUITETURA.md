@@ -26,6 +26,7 @@ O sistema digitaliza esse ciclo:
 | Leitura repetida do mesmo material | Soma na linha existente. Linhas separadas só se o parâmetro permitir. |
 | Atendida > solicitada | Bloqueado, salvo se o parâmetro for ligado. |
 | Número da SA | Único entre MEs não canceladas (parâmetro) e com formato validado por expressão regular configurável. |
+| Catálogo de materiais compartilhado | Decisão do responsável pelo projeto em 19/11/2026: Muribeca e Dois Irmãos utilizam um único cadastro mestre de materiais. A consulta é permitida aos usuários ativos com papel autorizado; inclusão, alteração e importação seguem as permissões de cadastro. O catálogo compartilhado não concede acesso a movimentações de estoques não autorizados. |
 | Acesso por estoque | Almoxarife, equipe SA e gestor operam somente nos estoques vinculados. O administrador acessa todos. |
 | Saída offline | Não há sincronização offline no MVP. Existem reenvio seguro, idempotência e preservação do preenchimento. |
 | PDF | Gerado pelo próprio navegador ("Imprimir / Salvar como PDF") com layout fiel ao formulário em papel. |
@@ -389,3 +390,15 @@ foram confirmadas pelo rosto. Começa **desligado**. Testes: `supabase/tests/98_
 
 **Limites conhecidos.** A prova de vida por movimento do rosto barra foto parada, mas não é certificada contra vídeo ou
 máscara; o rigor padrão (semelhança mínima de 50%) precisa ser calibrado com o uso real.
+
+## Decisão de negócio: catálogo compartilhado (19/11/2026)
+
+O responsável pelo projeto definiu que o catálogo de materiais é corporativo e compartilhado entre **Muribeca** e **Dois Irmãos**. O estoque selecionado no cabeçalho não transforma o cadastro mestre em um catálogo exclusivo daquele estoque.
+
+- Código, referência, descrição, unidade e QR Code pertencem ao cadastro compartilhado; alterações feitas por um perfil autorizado afetam esse cadastro comum.
+- Campos de localização ou associação de estoque no material são metadados de cadastro e não uma fronteira de isolamento do catálogo.
+- MEs, retiradas, pendências, consultas e exportações de movimentações continuam sujeitas às permissões e aos estoques autorizados do usuário. O administrador mantém o acesso global previsto pelo seu perfil e pelas exigências de MFA.
+- Alterações do cadastro não reescrevem os dados históricos já copiados nos itens de MEs emitidas.
+- Esta decisão trata somente do catálogo de materiais. Não amplia acesso a funcionários, biometria, fotos, assinaturas ou documentos.
+
+A decisão resolve a escolha de negócio do achado **M11** do relatório LGPD; a verificação das policies efetivamente aplicadas e dos testes de autorização permanece necessária. Não requer migração ou alteração de permissões nesta atualização documental.
