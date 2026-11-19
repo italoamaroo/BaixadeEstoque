@@ -28,7 +28,7 @@ import { useHeaderWarehouseFilter } from '@/hooks/useHeaderWarehouseFilter';
 import { STATUS_LABELS } from '@/lib/constants';
 import type { DashboardData, MovementRow, MovementStatus } from '@/types/db';
 
-const WH_COLORS = ['#4e803d', '#80ad68', '#64748b', '#c58b36', '#33522c'];
+const WH_COLORS = ['#1d43c4', '#0d9488', '#f97316', '#7c3aed', '#64748b'];
 const AGING_COLORS: Record<string, string> = {
   'Até 1 dia': '#fbbf24',
   '2 a 3 dias': '#f97316',
@@ -211,8 +211,8 @@ export function DashboardPage() {
   const statuses = c ? [
     { label: 'Aguardando confirmação', value: confirmationCount ?? 0, color: '#c58b36' },
     { label: 'Aguardando aprovação', value: c.aguardando_aprovacao, color: '#b7791f' },
-    { label: 'Pendente SA / ERP', value: c.aguardando_sa + c.sa_informada, color: '#80ad68' },
-    { label: 'Concluídas', value: c.concluida, color: '#4e803d' },
+    { label: 'Pendente SA / ERP', value: c.aguardando_sa + c.sa_informada, color: '#93b4fd' },
+    { label: 'Concluídas', value: c.concluida, color: '#1d43c4' },
     { label: 'Canceladas', value: c.cancelada, color: '#94a3b8' },
     { label: 'Em preparação / outras', value: Math.max(0, c.total_mes - (confirmationCount ?? 0) - c.aguardando_aprovacao - c.aguardando_sa - c.sa_informada - c.concluida - c.cancelada), color: '#64748b' },
   ].filter((v) => v.value > 0) : [];
@@ -309,7 +309,7 @@ export function DashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                   <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} /><YAxis type="category" dataKey="nome" width={140} tick={{ fontSize: 11 }} />
                   <Tooltip formatter={(v) => [`${v} linhas de retirada`, 'Frequência']} labelFormatter={(_, p) => p?.[0]?.payload?.material ?? ''} />
-                  <Bar isAnimationActive={false} dataKey="lines" fill="#4e803d" radius={[0, 4, 4, 0]} />
+                  <Bar isAnimationActive={false} dataKey="lines" fill="#1d43c4" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>}
             </ChartCard>
@@ -369,8 +369,8 @@ export function DashboardPage() {
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                   <Tooltip cursor={{ fill: '#f1f5f9' }} />
                   <Legend />
-                  <Bar isAnimationActive={false} dataKey="mes" name="MEs" fill="#4e803d" radius={[3, 3, 0, 0]} />
-                  <Bar isAnimationActive={false} dataKey="item_lines" name="Linhas de itens" fill="#a8c795" radius={[3, 3, 0, 0]} />
+                  <Bar isAnimationActive={false} dataKey="mes" name="MEs" fill="#1d43c4" radius={[3, 3, 0, 0]} />
+                  <Bar isAnimationActive={false} dataKey="item_lines" name="Linhas de itens" fill="#93b4fd" radius={[3, 3, 0, 0]} />
                   <Bar isAnimationActive={false} dataKey="pending_sa" name="Aguardando SA" fill="#f97316" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -405,7 +405,7 @@ export function DashboardPage() {
                   <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
                   <YAxis type="category" dataKey="nome" width={150} tick={{ fontSize: 11 }} />
                   <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(v) => [`${v} linhas`, 'Saídas']} labelFormatter={(_, p) => p?.[0]?.payload?.material ?? ''} />
-                  <Bar isAnimationActive={false} dataKey="lines" fill="#4e803d" radius={[0, 3, 3, 0]} />
+                  <Bar isAnimationActive={false} dataKey="lines" fill="#1d43c4" radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
               )}
@@ -421,7 +421,7 @@ export function DashboardPage() {
                   <XAxis type="number" tick={{ fontSize: 11 }} />
                   <YAxis type="category" dataKey="nome" width={170} tick={{ fontSize: 11 }} />
                   <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(v, _n, p) => [`${fmtQty(Number(v))} ${p?.payload?.unit ?? ''}`, 'Atendido']} labelFormatter={(_, p) => p?.[0]?.payload?.material ?? ''} />
-                  <Bar isAnimationActive={false} dataKey="qty" fill="#669e50" radius={[0, 3, 3, 0]} />
+                  <Bar isAnimationActive={false} dataKey="qty" fill="#0d9488" radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
               )}
@@ -444,7 +444,7 @@ export function DashboardPage() {
                       <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
                       <YAxis type="category" dataKey="nome" width={170} tick={{ fontSize: 11 }} />
                       <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(v) => [`${v} MEs`]} labelFormatter={(_, p) => p?.[0]?.payload?.label ?? ''} />
-                      <Bar isAnimationActive={false} dataKey="mes" fill="#4e803d" radius={[0, 3, 3, 0]} />
+                      <Bar isAnimationActive={false} dataKey="mes" fill="#1d43c4" radius={[0, 3, 3, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
