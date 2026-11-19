@@ -8,7 +8,7 @@ import { PageLoader } from './ui/Spinner';
 import { errorMessage } from '@/lib/errors';
 
 /** O servidor também exige AAL2. Nenhum segredo TOTP vai para logs ou armazenamento da aplicação. */
-export function AdminMfaGate({ children }: { children: ReactNode }) {
+export function AdminMfaGate({ children, setup = false }: { children: ReactNode; setup?: boolean }) {
   const { refreshAccess, signOut } = useAuth();
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -19,6 +19,13 @@ export function AdminMfaGate({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const inspect = async () => {
+    if (!setup) {
+      // Implantação em duas etapas: só exigir MFA no app quando o banco já conhece a regra.
+      // Após a migração, qualquer erro de rede/permissão continua falhando fechado.
+      const { error: policyError } = await supabase.rpc('session_is_aal2');
+      if (policyError?.code === 'PGRST202') { setReady(true); return; }
+      if (policyError) throw policyError;
+    }
     const { data, error: err } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (err) throw err;
     if (data.currentLevel === 'aal2') { setReady(true); return; }

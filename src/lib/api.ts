@@ -464,7 +464,13 @@ export interface ProfileName {
   active: boolean;
 }
 export async function listProfiles(): Promise<ProfileName[]> {
-  return rpc<ProfileName[]>('profile_directory');
+  const { data, error } = await supabase.rpc('profile_directory');
+  if (!error) return data as ProfileName[];
+  if (error.code !== 'PGRST202') throw toAppError(error);
+  // Compatibilidade SOMENTE enquanto a RPC ainda não existe no banco antigo.
+  // Nunca solicitar e-mail; após a migração, erro de autorização não usa fallback.
+  const legacy = await supabase.from('profiles').select('id, full_name, active').order('full_name');
+  return (unwrap(legacy) ?? []) as ProfileName[];
 }
 
 // ---------------------------------------------------------------------------

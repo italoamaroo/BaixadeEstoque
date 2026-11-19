@@ -35,6 +35,7 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
 export async function fetchPdfData(filters: Partial<MovementFilters>, onProgress: Progress = () => undefined) {
   onProgress('Autorizando exportação e registrando a solicitação…');
   const { data: authorization, error: authorizationError } = await supabase.rpc('authorize_signed_pdf_export', { p_filters: toRpcFilters(filters) });
+  if (authorizationError?.code === 'PGRST202') throw new Error('O PDF com assinaturas exige a atualização de segurança do banco (migração 27). Solicite ao administrador a conclusão da atualização.');
   if (authorizationError) throw toAppError(authorizationError);
   const { rows: list, total, request_id: requestId } = authorization as { rows: MovementRow[]; total: number; request_id: string };
   const ids = list.map((m) => m.id);
