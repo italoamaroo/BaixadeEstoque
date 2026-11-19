@@ -77,8 +77,16 @@ O registro anterior como proposta é o histórico da decisão. A implementação
 
 ## Identificação de privacidade informada pelo responsável (19/11/2026)
 
-- **Controlador informado:** ITALO BRITO AMARO DA SILVA.
-- **Canal de atendimento aos titulares:** ainda não informado.
-- **Encarregado, se aplicável:** ainda não definido neste registro; a indicação de controlador não equivale à designação de encarregado.
+Dados informados pelo responsável e com publicação no repositório público `italoamaroo/BaixadeEstoque` expressamente autorizada em 19/11/2026:
 
-A identificação acima registra a declaração do responsável pelo projeto. É necessário confirmar se Italo atua como controlador em nome próprio ou como representante da pessoa jurídica que decide as finalidades e os meios do tratamento; nesse último caso, identificar também a razão social e o CNPJ da entidade controladora. Este registro documental não altera automaticamente a configuração LGPD no Supabase nem comprova publicação do aviso de privacidade.
+- **Controlador (razão social informada):** CONSORCIO RECIFE AMBIENTAL.
+- **CNPJ informado do controlador:** 45.791.369/0001-06.
+- **Encarregado (DPO) informado:** ITALO BRITO AMARO DA SILVA.
+- **Canal informado para pedidos de privacidade:** italo.amaro@consorciorecifeambiental.com.br.
+- **Telefone de contato informado:** (84) 99850-2396.
+
+Esta identificação substitui o registro anterior que indicava Italo como controlador em nome próprio. A entidade controladora informada é o Consórcio; Italo foi indicado como encarregado. A indicação no sistema não comprova, por si só, designação formal do encarregado, validade cadastral do CNPJ ou publicação do aviso aos titulares. Não se presume atendimento por WhatsApp pelo simples fornecimento do telefone.
+
+A imagem fornecida evidencia o preenchimento dos campos, sem comprovar que a configuração foi salva no banco. Esta atualização registra os dados na documentação; não altera automaticamente a configuração do Supabase.
+
+O responsável também informou a existência de documento assinado do DP para reconhecimento facial no controle de ponto. O documento não foi examinado; sua abrangência para identificação e confirmação de retirada de materiais e para compartilhamento da base facial permanece pendente de verificação. Essa informação não equivale à validação jurídica do uso no almoxarifado.
