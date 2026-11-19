@@ -96,6 +96,11 @@ O responsável confirmou a existência de termo assinado do DP e declarou expres
 
 O responsável confirmou **o mesmo prazo de 10 anos** para cadastros faciais, logs, dados offline e backups, além das MEs e seus comprovantes. Esta decisão substitui a pendência de escolha do prazo dessas quatro categorias na proposta anterior. Não se trata de prazo legal obrigatório presumido.
 
-A contagem de documentos vinculados à ME continua desde sua conclusão ou, se cancelada, desde o cancelamento. Para cadastros e registros sem vínculo com uma ME, o evento inicial ainda precisa ser definido: não existe uma conclusão de ME única que possa ser presumida. O tratamento de backups com dados de várias movimentações também depende dessa definição.
+A contagem de documentos vinculados à ME continua desde sua conclusão ou, se cancelada, desde o cancelamento. Para cadastros faciais, logs, dados offline e backups sem vínculo com uma ME, o responsável definiu expressamente a **data de criação de cada registro ou cópia** como início dos 10 anos. Não usar desligamento do funcionário, última utilização ou atualização como marco. Para backups, considerar a criação de cada cópia; a criação de uma cópia não reinicia a contagem dos registros de origem.
 
 **Situação técnica:** a regra implementada pela migração 28 continua limitada às MEs e comprovantes. Este registro não modifica a remoção de modelos faciais, a expiração de logs, a limpeza de dados locais nem a política do provedor de backups. A guarda central de um registro originado offline e a permanência de sua cópia no aparelho são controles distintos; falta definir como executar a decisão para cada um.
+
+
+### Marco confirmado para registros sem ME (19/11/2026)
+
+Decisão do responsável: **10 anos desde a data de criação** para cadastros faciais, logs, dados offline e backups sem vínculo direto com ME. Esta decisão resolve a pendência do marco inicial dessas categorias nas seções anteriores. MEs e comprovantes vinculados mantêm o marco de conclusão/cancelamento já implementado. Registros sem data de criação confiável exigem conferência; não inventar datas. A confirmação registra a política, sem afirmar que sua implementação técnica ou a retenção do provedor de backups já foi alterada.
