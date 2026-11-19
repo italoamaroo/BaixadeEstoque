@@ -19,6 +19,7 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   cancelBeforeSa: 'Cancelar ME por devolução antes da SA (estoque autorizado)',
   correctMovement: 'Correção administrativa de ME',
   replaceSignature: 'Coletar nova assinatura (mantém a anterior)',
+  exportSignedPdf: 'Exportar PDF com assinaturas',
   exportExcel: 'Exportar para Excel',
   viewDashboard: 'Painel e consultas dos estoques autorizados',
   viewMovements: 'Lista e detalhes das MEs dos estoques autorizados',

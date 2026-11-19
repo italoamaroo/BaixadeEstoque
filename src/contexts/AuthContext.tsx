@@ -1,4 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { clearSessionDrafts } from '@/lib/draft';
+import { invalidateLookups } from '@/hooks/useLookups';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { getAccess, logSession, reportLoginFailure } from '@/lib/api';
@@ -35,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessError, setAccessError] = useState<string | null>(null);
   const [recoveryMode, setRecoveryMode] = useState(false);
   const loadedFor = useRef<string | null>(null);
+  const previousUid = useRef<string | null>(null);
 
   const loadAccess = useCallback(async (userId: string | null) => {
     if (!userId) {
@@ -79,10 +82,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(newSession);
       if (event === 'PASSWORD_RECOVERY') setRecoveryMode(true);
       const uid = newSession?.user.id ?? null;
+      if (previousUid.current && uid !== previousUid.current) {
+        clearSessionDrafts();
+        invalidateLookups();
+      }
+      previousUid.current = uid;
       // Evita chamadas ao Supabase dentro do callback (recomendação da biblioteca)
       if (event === 'SIGNED_OUT') {
+        clearSessionDrafts();
+        invalidateLookups();
+        void clearOfflineCache().catch(() => undefined);
         setTimeout(() => void loadAccess(null), 0);
-      } else if (uid && uid !== loadedFor.current) {
+      } else if (uid && (uid !== loadedFor.current || event === 'MFA_CHALLENGE_VERIFIED')) {
         setLoading(true);
         setTimeout(() => void loadAccess(uid), 0);
       }
@@ -122,7 +133,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       signOut: async () => {
         await logSession('logout');
-        await supabase.auth.signOut();
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+        clearSessionDrafts();
+        invalidateLookups();
         // LGPD: a cópia local de cadastros sai junto (a fila de saídas não enviadas fica)
         await clearOfflineCache().catch(() => undefined);
         setAccess(null);

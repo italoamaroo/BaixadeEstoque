@@ -21,23 +21,22 @@ interface Props {
   emergencyOnly?: boolean;
 }
 
-let profileCache: ProfileName[] | null = null;
+
 
 export function FiltersPanel({ value, onApply, quickSearch = true, defaultOpen = false, emergencyOnly = false }: Props) {
   const { warehouses } = useAuth();
   const [draft, setDraft] = useState<MovementFilters>(value);
   const [open, setOpen] = useState(defaultOpen);
   const [error, setError] = useState<string | null>(null);
-  const [profiles, setProfiles] = useState<ProfileName[]>(profileCache ?? []);
+  const [profiles, setProfiles] = useState<ProfileName[]>([]);
   const { data: lk } = useLookups(['sectors', 'service_fronts', 'application_locations']);
 
   useEffect(() => setDraft(value), [value]);
 
   useEffect(() => {
-    if (!open || profileCache) return;
+    if (!open) return;
     listProfiles()
       .then((p) => {
-        profileCache = p;
         setProfiles(p);
       })
       .catch(() => undefined);

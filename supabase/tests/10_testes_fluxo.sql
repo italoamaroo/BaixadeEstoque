@@ -187,7 +187,7 @@ begin;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000d1', true);
 select testes.igual((select count(*) from public.stock_movements)::int, 0, 'usuário sem perfil não vê MEs');
-select testes.falha(format($$select public.create_movement('{"id":"%s"}')$$, :'me3'), 'não permite registrar');
+select testes.falha(format($$select public.create_movement('{"id":"%s"}')$$, :'me3'), 'Sessão inválida');
 commit;
 
 -- ---------------------------------------------------------------------

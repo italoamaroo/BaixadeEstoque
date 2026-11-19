@@ -21,7 +21,7 @@ export default defineConfig({
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
-  server: { port: 5173, host: true },
+  server: { port: 5173, host: '127.0.0.1' },
   build: {
     sourcemap: false,
     chunkSizeWarningLimit: 1200,

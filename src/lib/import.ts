@@ -1,3 +1,4 @@
+import { validateImportMatrix, validateXlsxArchive } from './importLimits';
 import { downloadBlob } from './excel';
 
 export const IMPORT_COLUMNS = [
@@ -173,16 +174,19 @@ export function displayText(v: number | Date, numFmt?: string): string {
 /** Lê a primeira aba de um .xlsx ou um .csv e devolve a matriz de células. */
 export async function readSheetMatrix(file: File): Promise<unknown[][]> {
   if (file.size > 5 * 1024 * 1024) throw new Error('Arquivo maior que 5 MB.');
-  if (/\.csv$/i.test(file.name) || file.type === 'text/csv') return parseCsv(await file.text());
+  if (/\.csv$/i.test(file.name) || file.type === 'text/csv') { const matrix = parseCsv(await file.text()); validateImportMatrix(matrix); return matrix; }
   if (/\.xls$/i.test(file.name)) {
     throw new Error('Arquivo .xls (Excel antigo) não é suportado. No Excel, use "Salvar como" > "Pasta de Trabalho do Excel (.xlsx)".');
   }
   if (/\.xlsx$/i.test(file.name)) {
+    const buffer = await file.arrayBuffer();
+    validateXlsxArchive(buffer);
     const ExcelJS = (await import('exceljs')).default;
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(await file.arrayBuffer());
+    await wb.xlsx.load(buffer);
     const ws = wb.worksheets[0];
     if (!ws) throw new Error('Planilha vazia.');
+    if (ws.rowCount > 5001 || ws.columnCount > 100) throw new Error('Planilha com linhas ou colunas em excesso.');
     const matrix: unknown[][] = [];
     ws.eachRow({ includeEmpty: false }, (row) => {
       const line: unknown[] = [];
@@ -193,6 +197,7 @@ export async function readSheetMatrix(file: File): Promise<unknown[][]> {
       });
       matrix.push(line);
     });
+    validateImportMatrix(matrix);
     if (matrix.length === 0) throw new Error('Planilha vazia.');
     return matrix;
   }

@@ -2,7 +2,7 @@ import { readdirSync } from 'node:fs';
 
 // Entry points belong here; modules belong in the established subdirectories.
 const rootFiles = new Set([
-  '.env.example', '.gitignore', 'README.md', 'index.html', 'package.json',
+  '.git', '.env.example', '.gitignore', 'README.md', 'index.html', 'package.json',
   'package-lock.json', 'postcss.config.js', 'render.yaml', 'tailwind.config.js',
   'tsconfig.app.json', 'tsconfig.json', 'tsconfig.node.json', 'vite.config.ts',
 ]);

@@ -1,9 +1,8 @@
 import { supabase, SIGNATURE_BUCKET } from './supabase';
-import { searchMovements } from './api';
 import { toAppError } from './errors';
 import { STATUS_LABELS } from './constants';
 import { fmtDateTime, fmtQty } from './format';
-import type { MovementFilters } from './filters';
+import { toRpcFilters, type MovementFilters } from './filters';
 import type { MovementItem, MovementRow, SignatureRecord } from '@/types/db';
 
 export const PDF_LIMIT = 500;
@@ -34,16 +33,10 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
 
 /** Busca MEs (mesmos filtros da tela), itens e assinatura atual de cada uma. */
 export async function fetchPdfData(filters: Partial<MovementFilters>, onProgress: Progress = () => undefined) {
-  const movements: MovementRow[] = [];
-  let total = 0;
-  for (let page = 1; movements.length < PDF_LIMIT; page++) {
-    onProgress(`Buscando MEs (${movements.length})…`);
-    const r = await searchMovements(filters, page, 200, 'movement_at', 'asc');
-    total = r.total;
-    movements.push(...r.rows);
-    if (r.rows.length < 200) break;
-  }
-  const list = movements.slice(0, PDF_LIMIT);
+  onProgress('Autorizando exportação e registrando a solicitação…');
+  const { data: authorization, error: authorizationError } = await supabase.rpc('authorize_signed_pdf_export', { p_filters: toRpcFilters(filters) });
+  if (authorizationError) throw toAppError(authorizationError);
+  const { rows: list, total, request_id: requestId } = authorization as { rows: MovementRow[]; total: number; request_id: string };
   const ids = list.map((m) => m.id);
 
   const items = new Map<string, MovementItem[]>();
@@ -99,7 +92,7 @@ export async function fetchPdfData(filters: Partial<MovementFilters>, onProgress
     signature: sigs.get(m.id) ?? null,
     signatureDataUrl: images.get(m.id) ?? null,
   }));
-  return { rows, total, truncated: total > list.length };
+  return { rows, total, requestId, truncated: total > list.length };
 }
 
 /** Mantém texto compatível com a fonte padrão do PDF. */

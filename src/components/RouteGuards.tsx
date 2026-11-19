@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { ShieldAlert, UserX } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Permission } from '@/lib/constants';
+import { AdminMfaGate } from './AdminMfaGate';
 import { PageLoader } from './ui/Spinner';
 import { Button } from './ui/Button';
 import { Alert, EmptyState } from './ui/Card';
@@ -53,7 +54,7 @@ export function ProtectedRoute() {
     );
   }
 
-  return <Outlet />;
+  return roles.includes('admin') ? <AdminMfaGate><Outlet /></AdminMfaGate> : <Outlet />;
 }
 
 /** Bloqueia a tela para perfis sem permissão (o banco também bloqueia). */

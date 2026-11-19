@@ -1,0 +1,33 @@
+\set ON_ERROR_STOP 1
+-- Todos os dados de teste desta verificação são revertidos ao final.
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000d1',true);
+select testes.igual(public.is_active_user(),false,'sem papel não é usuário operacional');
+select testes.igual((select count(*) from public.employees)::int,0,'sem papel não lê funcionários');
+select testes.igual((select count(*) from public.materials)::int,0,'sem papel não lê materiais');
+select testes.falha($$select public.profile_directory()$$,'Acesso não permitido');
+select testes.falha($$select email from public.profiles$$,'permission denied');
+select testes.falha($$select public.authorize_signed_pdf_export('{}')$$,'Somente gestor');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a',true);
+select set_config('request.jwt.claims','{}',true);
+select testes.igual(public.is_admin(),false,'sem claim AAL2 não é administrador efetivo');
+select testes.falha($$select public.admin_list_users()$$,'Somente administrador');
+select set_config('request.jwt.claims','{"aal":"aal1"}',true);
+select testes.igual(public.is_admin(),false,'admin AAL1 bloqueado');
+select testes.falha($$select public.authorize_signed_pdf_export('{}')$$,'Somente gestor');
+select set_config('request.jwt.claims','{"aal":"aal2"}',true);
+select testes.igual(public.is_admin(),true,'admin AAL2 autorizado');
+select testes.igual(jsonb_typeof(public.admin_list_users()),'array'::text,'admin MFA pode gerenciar');
+select testes.igual(public.profile_directory()::text like '%@%',false,'diretório não expõe email');
+select testes.falha($$select public.business_days_add(current_date,2147483647)$$,'limite');
+select testes.falha($$select public.business_days_between('1900-01-01','2200-01-01')$$,'limite');
+select testes.falha($$select public.business_days_add('infinity',1)$$,'limite');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b1',true);
+select testes.falha($$select public.authorize_signed_pdf_export('{}')$$,'Somente gestor');
+select testes.igual((select count(*) from public.signatures)::int,0,'equipe SA não lê assinaturas');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000c1',true);
+select testes.igual((public.authorize_signed_pdf_export('{}') ->> 'request_id') is not null,true,'gestor recebe protocolo auditado');
+select testes.falha($$select public.audit_admin_provisioning('00000000-0000-0000-0000-00000000000a','x@y.z','concluida')$$,'permission denied');
+rollback;
+select '>>> ENDURECIMENTO LGPD PASSOU' as resultado;

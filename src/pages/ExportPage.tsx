@@ -7,16 +7,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { FiltersPanel } from '@/components/FiltersPanel';
 import { Button } from '@/components/ui/Button';
 import { Alert, Card, CardHeader, PageHeader } from '@/components/ui/Card';
-import { exportMovements, logEvent, searchMovements } from '@/lib/api';
+import { exportMovements, searchMovements } from '@/lib/api';
 import { buildWorkbook, downloadBlob, type ExportKind } from '@/lib/excel';
 import { buildMovementsPdf, fetchPdfData, PDF_LIMIT } from '@/lib/pdfReport';
 import { errorMessage } from '@/lib/errors';
-import { describeFilters, exportFileName, filtersFromSearchParams, filtersToSearchParams, toRpcFilters } from '@/lib/filters';
+import { describeFilters, exportFileName, filtersFromSearchParams, filtersToSearchParams } from '@/lib/filters';
 import { useHeaderWarehouseFilter } from '@/hooks/useHeaderWarehouseFilter';
 import { fmtInt } from '@/lib/format';
 
 export function ExportPage() {
-  const { warehouses, displayName, settings } = useAuth();
+  const { warehouses, displayName, settings, can } = useAuth();
   useHeaderWarehouseFilter();
   const [params, setParams] = useSearchParams();
   const filters = useMemo(() => filtersFromSearchParams(params), [params]);
@@ -63,7 +63,7 @@ export function ExportPage() {
   };
 
   const runPdf = async () => {
-    if (pdfBusy) return;
+    if (pdfBusy || !can('exportSignedPdf')) return;
     setPdfBusy(true);
     setError(null);
     try {
@@ -82,7 +82,7 @@ export function ExportPage() {
       });
       const pdfName = fileName.replace(/(_itens)?\.xlsx$/, '_com_assinaturas.pdf');
       downloadBlob(blob, pdfName);
-      void logEvent('me.pdf_gerado', null, { relatorio: true, mes: data.rows.length, filtros: toRpcFilters(filters), arquivo: pdfName });
+
       toast.success(`PDF gerado com ${fmtInt(data.rows.length)} ME(s).`);
       if (data.truncated) toast.warning(`Foram incluídas as primeiras ${PDF_LIMIT} MEs. Refine os filtros para gerar o restante.`);
     } catch (err) {
@@ -152,7 +152,7 @@ export function ExportPage() {
         </div>
       </Card>
 
-      <Card>
+      {can('exportSignedPdf') && <Card>
         <CardHeader
           title="PDF com itens e assinaturas"
           subtitle={`Formulário de Movimentação de Estoque, com logo, materiais e assinatura de recebimento, sem capa. MEs extensas continuam nas páginas seguintes. Usa os mesmos filtros acima (até ${PDF_LIMIT} MEs por arquivo).`}
@@ -165,7 +165,7 @@ export function ExportPage() {
             Gerar PDF
           </Button>
         </div>
-      </Card>
+      </Card>}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { validateImportMatrix, validateXlsxArchive } from './importLimits';
 import { downloadBlob } from './excel';
 import { parseCsv } from './import';
 
@@ -83,18 +84,22 @@ export async function parseEmployeesFile(file: File): Promise<Record<string, unk
     throw new Error('Arquivo .xls (Excel antigo) não é suportado. No Excel, use "Salvar como" > "Pasta de Trabalho do Excel (.xlsx)".');
   }
   if (/\.csv$/i.test(file.name) || file.type === 'text/csv') {
-    return employeeMatrixToRows(parseCsv(await file.text()));
+    const matrix = parseCsv(await file.text()); validateImportMatrix(matrix); return employeeMatrixToRows(matrix);
   }
   if (/\.xlsx$/i.test(file.name)) {
+    const buffer = await file.arrayBuffer();
+    validateXlsxArchive(buffer);
     const ExcelJS = (await import('exceljs')).default;
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(await file.arrayBuffer());
+    await wb.xlsx.load(buffer);
     const ws = wb.worksheets[0];
     if (!ws) throw new Error('Planilha vazia.');
+    if (ws.rowCount > 5001 || ws.columnCount > 100) throw new Error('Planilha com linhas ou colunas em excesso.');
     const matrix: unknown[][] = [];
     ws.eachRow({ includeEmpty: false }, (row) => {
       matrix.push((row.values as unknown[]).slice(1));
     });
+    validateImportMatrix(matrix);
     if (matrix.length === 0) throw new Error('Planilha vazia.');
     return employeeMatrixToRows(matrix);
   }

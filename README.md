@@ -13,6 +13,14 @@ Aplicação web para controlar as **saídas de material** dos almoxarifados **Mu
 
 ---
 
+## Atualização de segurança e LGPD
+
+O endurecimento técnico, as limitações e a ordem de implantação estão em
+[`docs/CORRECOES_LGPD.md`](docs/CORRECOES_LGPD.md).
+Em banco existente, publique o front-end e configure/verifique MFA dos administradores
+antes de executar `supabase/sql/27_endurecimento_lgpd.sql`.
+Não reaplique todo o instalador em produção para esta atualização.
+
 ## 1. Visão geral
 
 | Perfil | O que faz |

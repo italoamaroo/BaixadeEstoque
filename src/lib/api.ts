@@ -55,11 +55,8 @@ export async function logSession(action: 'login' | 'logout') {
   }
 }
 /** Falha de login (sem sessão). O banco grava só o e-mail mascarado e um hash. */
-export function reportLoginFailure(email: string) {
-  void supabase.rpc('report_login_failure', { p_email: email }).then(
-    () => undefined,
-    () => undefined,
-  );
+export function reportLoginFailure(_email: string) {
+  // Falhas devem vir do log do Supabase Auth; não tratamos o relato da tela como prova.
 }
 
 function unwrap<T>(res: { data: T | null; error: unknown }): T {
@@ -447,7 +444,7 @@ export async function adminCreateUser(input: { email: string; full_name: string;
     throw toAppError({ message: msg });
   }
   if ((data as { error?: string })?.error) throw new AppError((data as { error: string }).error);
-  return data as { id: string; email: string };
+  return data as { id: string; email: string; warning?: string };
 }
 
 export async function sendPasswordReset(email: string) {
@@ -464,12 +461,10 @@ export const updateSettings = (s: Partial<Settings>) => rpc<Settings>('update_se
 export interface ProfileName {
   id: string;
   full_name: string;
-  email: string;
   active: boolean;
 }
 export async function listProfiles(): Promise<ProfileName[]> {
-  const res = await supabase.from('profiles').select('id, full_name, email, active').order('full_name');
-  return (unwrap(res) ?? []) as ProfileName[];
+  return rpc<ProfileName[]>('profile_directory');
 }
 
 // ---------------------------------------------------------------------------
