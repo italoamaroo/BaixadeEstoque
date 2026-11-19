@@ -9669,28 +9669,28 @@ grant execute on function public.dsr_employee_report(uuid, bigint) to authentica
 begin;
 
 create or replace function public.session_is_aal2()
-returns boolean language sql stable security definer set search_path = public, pg_temp as $
+returns boolean language sql stable security definer set search_path = public, pg_temp as $$
   select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'aal', '') = 'aal2';
-$;
+$$;
 
 -- Papel administrativo só é efetivo com segundo fator verificado pelo Supabase Auth.
 create or replace function public.has_role(p_role public.app_role)
-returns boolean language sql stable security definer set search_path = public, pg_temp as $
+returns boolean language sql stable security definer set search_path = public, pg_temp as $$
   select exists (select 1 from public.user_roles r join public.profiles p on p.id = r.user_id
     where r.user_id = auth.uid() and p.active and r.role = p_role
       and (r.role <> 'admin' or public.session_is_aal2()));
-$;
+$$;
 create or replace function public.has_any_role(p_roles public.app_role[])
-returns boolean language sql stable security definer set search_path = public, pg_temp as $
+returns boolean language sql stable security definer set search_path = public, pg_temp as $$
   select exists (select 1 from public.user_roles r join public.profiles p on p.id = r.user_id
     where r.user_id = auth.uid() and p.active and r.role = any(p_roles)
       and (r.role <> 'admin' or public.session_is_aal2()));
-$;
+$$;
 create or replace function public.is_active_user()
-returns boolean language sql stable security definer set search_path = public, pg_temp as $
+returns boolean language sql stable security definer set search_path = public, pg_temp as $$
   select exists (select 1 from public.profiles p where p.id = auth.uid() and p.active
     and exists (select 1 from public.user_roles r where r.user_id = p.id));
-$;
+$$;
 
 -- E-mails e perfis completos são obtidos pelas RPCs de acesso/administração, não pela tabela direta.
 drop policy if exists profiles_select on public.profiles;
@@ -9700,7 +9700,7 @@ create policy profiles_select on public.profiles for select to authenticated
 revoke select on public.profiles from authenticated;
 grant select (id,full_name,active) on public.profiles to authenticated;
 create or replace function public.profile_directory()
-returns jsonb language plpgsql stable security definer set search_path = public, pg_temp as $
+returns jsonb language plpgsql stable security definer set search_path = public, pg_temp as $$
 begin
   if not public.is_active_user() or not public.has_any_role(array['almoxarife','equipe_sa','gestor','admin']::public.app_role[]) then
     raise exception 'Acesso não permitido.' using errcode = '42501';
@@ -9709,7 +9709,7 @@ begin
     from public.profiles p where p.id = auth.uid() or public.is_admin() or exists (
       select 1 from public.user_warehouses w where w.user_id = p.id and public.can_access_warehouse(w.warehouse_id)
     )), '[]'::jsonb);
-end; $;
+end; $$;
 
 drop policy if exists counter_sessions_select on public.counter_sessions;
 create policy counter_sessions_select on public.counter_sessions for select to authenticated using (
@@ -9719,13 +9719,13 @@ create policy counter_sessions_select on public.counter_sessions for select to a
 
 -- Equipe SA pode exportar Excel; PDF com assinatura exige gestor/admin.
 create or replace function public.can_read_signature(p_movement_id uuid)
-returns boolean language sql stable security definer set search_path = public, pg_temp as $
+returns boolean language sql stable security definer set search_path = public, pg_temp as $$
   select public.can_access_movement(p_movement_id) and (
     public.has_any_role(array['gestor','admin']::public.app_role[])
     or (public.has_role('almoxarife') and exists (
       select 1 from public.stock_movements m where m.id = p_movement_id and m.created_by = auth.uid()
     )));
-$;
+$$;
 drop policy if exists signatures_select on public.signatures;
 create policy signatures_select on public.signatures for select to authenticated using (public.can_read_signature(movement_id));
 drop policy if exists "assinaturas: leitura por estoque autorizado" on storage.objects;
@@ -9745,7 +9745,7 @@ create policy "assinaturas: verificar proprio envio" on storage.objects for sele
 );
 
 create or replace function public.authorize_signed_pdf_export(p_filters jsonb default '{}'::jsonb)
-returns jsonb language plpgsql security definer set search_path = public, pg_temp as $
+returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
 declare
   v_total int;
   v_rows jsonb;
@@ -9766,13 +9766,13 @@ begin
     jsonb_build_object('protocolo',v_id,'quantidade',jsonb_array_length(v_rows),'total',v_total,
       'observacao','Solicitação autorizada; não comprova download no navegador.'));
   return jsonb_build_object('rows',v_rows,'total',v_total,'request_id',v_id);
-end; $;
+end; $$;
 
 -- Remover a entrada pública de relatos não verificáveis. Auth permanece fonte de falhas reais.
 revoke all on function public.report_login_failure(text) from public, anon, authenticated;
 
 create or replace function public.business_days_add(p_from date, p_days integer)
-returns date language plpgsql stable security definer set search_path = public, pg_temp as $
+returns date language plpgsql stable security definer set search_path = public, pg_temp as $$
 declare d date := p_from; n int := 0; scanned int := 0;
 begin
   if p_from is null or p_days is null then return null; end if;
@@ -9785,9 +9785,9 @@ begin
     if public.is_business_day(d) then n := n + 1; end if;
   end loop;
   return d;
-end; $;
+end; $$;
 create or replace function public.business_days_between(p_from date, p_to date)
-returns integer language plpgsql stable security definer set search_path = public, pg_temp as $
+returns integer language plpgsql stable security definer set search_path = public, pg_temp as $$
 declare n int;
 begin
   if p_from is null or p_to is null then return null; end if;
@@ -9798,11 +9798,11 @@ begin
   select count(*)::int into n from generate_series(least(p_from,p_to)+1,greatest(p_from,p_to),interval '1 day') g
     where public.is_business_day(g::date);
   return case when p_to >= p_from then n else -n end;
-end; $;
+end; $$;
 
 -- Esta função só pode ser chamada pela Edge Function com service_role.
 create or replace function public.audit_admin_provisioning(p_actor uuid,p_target text,p_stage text)
-returns void language plpgsql security definer set search_path = public, pg_temp as $
+returns void language plpgsql security definer set search_path = public, pg_temp as $$
 begin
   if p_stage not in ('solicitada','concluida','falha') or not exists (
     select 1 from public.profiles p join public.user_roles r on r.user_id=p.id
@@ -9810,16 +9810,16 @@ begin
   ) then raise exception 'Registro administrativo inválido.' using errcode='42501'; end if;
   perform public.audit_event('usuario.provisionamento_' || p_stage,'profiles',p_actor::text,null,null,null,
     jsonb_build_object('ator',p_actor,'destinatario',public.audit_mask_email(p_target),'etapa',p_stage));
-end; $;
+end; $$;
 revoke all on function public.audit_admin_provisioning(uuid,text,text) from public,anon,authenticated;
 grant execute on function public.audit_admin_provisioning(uuid,text,text) to service_role;
 
-do $ declare f text; begin
+do $$ declare f text; begin
   foreach f in array array['session_is_aal2()','profile_directory()','can_read_signature(uuid)','authorize_signed_pdf_export(jsonb)'] loop
     execute format('revoke all on function public.%s from public,anon', f);
     execute format('grant execute on function public.%s to authenticated', f);
   end loop;
-end $;
+end $$;
 create or replace function public.log_event(
   p_action      text,
   p_movement_id uuid default null,
@@ -9828,7 +9828,7 @@ create or replace function public.log_event(
 returns void
 language plpgsql security definer
 set search_path = public, pg_temp
-as $
+as $$
 declare
   v_wh uuid;
 begin
@@ -9853,7 +9853,7 @@ begin
   perform public.write_audit(p_action, case when p_movement_id is null then 'interface' else 'stock_movements' end,
                              p_movement_id::text, p_movement_id, v_wh, null, p_details, null);
 end;
-$;
+$$;
 commit;
 
 
