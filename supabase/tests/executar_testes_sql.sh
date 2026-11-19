@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Apenas PostgreSQL local/descartável: nunca aponte este comando ao Supabase de produção.
 set -euo pipefail
+# Sessões legadas de admin da suíte representam usuários que já concluíram MFA.
+# 99_testes_endurecimento sobrescreve explicitamente AAL1/AAL2 e ausência do claim.
+export PGOPTIONS="${PGOPTIONS:-} -c request.jwt.claims={\"aal\":\"aal2\"}"
 cd "$(dirname "$0")/.."
 DB="baixas_teste_$$"
 LOG=$(mktemp)

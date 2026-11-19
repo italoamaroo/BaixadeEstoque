@@ -7,20 +7,11 @@ set client_min_messages = warning;
 \set gestor '00000000-0000-0000-0000-0000000000c1'
 select id as mur from public.warehouses where code = 'MUR' \gset
 
--- 1) Falha de login (sem sessão): mascarada, contada, alerta na 5ª
-begin;
-set local role anon;
-select set_config('request.headers', '{"x-forwarded-for":"200.1.2.3"}', true);
-select public.report_login_failure('Fulano.Teste@Empresa.com') from generate_series(1, 5);
-select public.report_login_failure('sem-arroba');
-select public.report_login_failure('');
-commit;
-select testes.igual((select sum(attempts) from public.auth_login_failures where masked_email = 'f***@empresa.com')::int, 5, 'tentativas contadas na janela');
-select testes.igual((select count(*) from public.audit_logs where action = 'auth.falha_login' and entity_id = 'f***@empresa.com')::int, 2, 'eventos só na 1ª e na 5ª falha (sem inundar)');
-select testes.igual((select string_agg(distinct actor_type || '|' || result || '|' || coalesce(ip_address, '-'), ',') from public.audit_logs where action = 'auth.falha_login'), 'anonimo|falha|200.1.2.3', 'falha de login com IP e ator anônimo');
-select testes.igual((select count(*) from public.audit_logs where lower(coalesce(entity_id, '') || coalesce(new_data::text, '')) like '%fulano.teste%')::int, 0, 'e-mail completo nunca gravado');
-select testes.igual((select status || '|' || occurrences from public.security_alerts where rule = 'falhas_login'), 'aberto|1', 'alerta de falhas de login');
-select testes.igual((select count(*) from public.audit_logs where action = 'alerta.aberto' and category = 'incidente')::int >= 1, true, 'abertura de alerta registrada');
+-- 1) Relatos públicos foram revogados: não é permitido fabricar falhas de Auth.
+select testes.igual(has_function_privilege('anon','public.report_login_failure(text)','execute'),false,'anon não pode fabricar falhas de login');
+select testes.igual((select count(*) from public.auth_login_failures)::int, 0, 'nenhuma falha fabricada');
+-- Fixture de alerta confiável para testar seu tratamento abaixo (não é um relato anônimo).
+select public._raise_alert('falhas_login','aviso','Alerta de teste gerado pelo servidor','fixture-auth','{}'::jsonb);
 
 -- 2) Login e saída relatados pela tela
 begin;

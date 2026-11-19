@@ -5,7 +5,7 @@ services:
     name: baixas-estoque
     runtime: static
     branch: main
-    buildCommand: npm ci && npm run build
+    buildCommand: npm ci && npm run check
     staticPublishPath: ./dist
     pullRequestPreviewsEnabled: false
     envVars:
@@ -22,6 +22,10 @@ services:
         source: /*
         destination: /index.html
     headers:
+      # Primeira etapa: observar violações antes de bloquear recursos legítimos.
+      - path: /*
+        name: Content-Security-Policy-Report-Only
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
       - path: /*
         name: X-Frame-Options
         value: DENY

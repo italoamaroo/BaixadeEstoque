@@ -38,8 +38,9 @@ export async function enqueueMovement(q: Omit<QueuedMovement, 'status' | 'attemp
 }
 
 export async function listQueued(userId: string | null): Promise<QueuedMovement[]> {
+  if (!userId) return [];
   const all = await queueAll<QueuedMovement>();
-  return all.filter((q) => !userId || q.user_id === userId).sort((a, b) => a.saved_at.localeCompare(b.saved_at));
+  return all.filter((q) => q.user_id === userId).sort((a, b) => a.saved_at.localeCompare(b.saved_at));
 }
 
 export async function discardQueued(id: string) {

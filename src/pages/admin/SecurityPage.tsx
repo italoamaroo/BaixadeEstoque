@@ -1,3 +1,4 @@
+import { AdminMfaGate } from '@/components/AdminMfaGate';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, Lock, PlayCircle, ShieldAlert, Trash2, Unlock } from 'lucide-react';
@@ -49,6 +50,11 @@ function today(offsetDays = 0) {
 const catLabel = (c: string | null) => (c ? AUDIT_CATEGORY_LABELS[c] ?? c : 'Todas as categorias');
 
 export function SecurityPage() {
+  const { hasRole } = useAuth();
+  return hasRole('admin') ? <AdminMfaGate setup><SecurityContent /></AdminMfaGate> : <SecurityContent />;
+}
+
+function SecurityContent() {
   const { userId } = useAuth();
   const [data, setData] = useState<SecurityOverview | null>(null);
   const [error, setError] = useState<string | null>(null);

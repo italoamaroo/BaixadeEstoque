@@ -111,3 +111,12 @@ export function takeDuplicate(): MovementDraft | null {
     return null;
   }
 }
+
+/** Rascunhos não enviados não devem atravessar logout/troca de conta. A fila persistente é separada. */
+export function clearSessionDrafts(): void {
+  try {
+    for (const key of Object.keys(sessionStorage)) {
+      if (key.startsWith(PREFIX) || key === DUP_KEY) sessionStorage.removeItem(key);
+    }
+  } catch { /* navegador sem armazenamento */ }
+}

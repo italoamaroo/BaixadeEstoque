@@ -58,6 +58,7 @@ export const PERMISSIONS = {
   correctMovement: ['gestor', 'admin'],
   replaceSignature: ['gestor', 'admin'],
   exportExcel: ['equipe_sa', 'gestor', 'admin'],
+  exportSignedPdf: ['gestor', 'admin'],
   viewDashboard: ['gestor', 'admin', 'equipe_sa', 'almoxarife'],
   viewMovements: ['gestor', 'admin', 'equipe_sa', 'almoxarife'],
   useCounter: ['almoxarife', 'gestor', 'admin'],

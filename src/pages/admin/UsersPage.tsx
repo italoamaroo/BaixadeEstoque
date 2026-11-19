@@ -267,6 +267,7 @@ function CreateUserModal({ open, onClose, onCreated }: { open: boolean; onClose:
     try {
       const u = await adminCreateUser({ email: r.data.email, full_name: r.data.full_name, password: invite ? undefined : password, invite });
       toast.success(invite ? `Convite enviado para ${u.email}.` : `Usuário ${u.email} criado.`);
+      if (u.warning) toast.warning(u.warning);
       onClose();
       await onCreated(u.id);
     } catch (err) {
