@@ -2,6 +2,7 @@ import { useRef, useCallback, useEffect, useMemo, useState, type ReactNode } fro
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Bar,
+  Cell,
   BarChart,
   CartesianGrid,
   Legend,
@@ -10,23 +11,24 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { AlertTriangle, Ban, CalendarDays, CheckCheck, ClipboardList, Hourglass, Layers, PackageMinus, Scale, ShieldQuestion, Warehouse } from 'lucide-react';
+import { AlertTriangle, CalendarDays, CheckCheck, ClipboardList, Hourglass, PackageMinus, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { FiltersPanel } from '@/components/FiltersPanel';
-import { LinkButton } from '@/components/ui/Button';
+import { Button, LinkButton } from '@/components/ui/Button';
 import { Alert, Card, CardHeader, PageHeader } from '@/components/ui/Card';
 import { PageLoader } from '@/components/ui/Spinner';
-import { getDashboard, getRepeatAssetWithdrawals, type RepeatAssetWithdrawal } from '@/lib/api';
+import { getDashboard, getRepeatAssetWithdrawals, searchMovements, type RepeatAssetWithdrawal } from '@/lib/api';
 import { RepeatAssetCard } from '@/components/RepeatAssetCard';
 import { errorMessage } from '@/lib/errors';
 import { filtersFromSearchParams, filtersToSearchParams, type MovementFilters } from '@/lib/filters';
-import { fmtInt, fmtQty } from '@/lib/format';
+import { fmtInt, fmtQty, fmtDateTime, fmtRelative, daysSince, todayISO, firstDayOfMonthISO, isoDaysAgo } from '@/lib/format';
 import { useRealtimeMovements } from '@/hooks/useRealtimeMovements';
 import { useHeaderWarehouseFilter } from '@/hooks/useHeaderWarehouseFilter';
-import type { DashboardData } from '@/types/db';
+import { STATUS_LABELS } from '@/lib/constants';
+import type { DashboardData, MovementRow, MovementStatus } from '@/types/db';
 
-const WH_COLORS = ['#1d43c4', '#0d9488', '#f97316', '#7c3aed', '#64748b'];
+const WH_COLORS = ['#4e803d', '#80ad68', '#64748b', '#c58b36', '#33522c'];
 const AGING_COLORS: Record<string, string> = {
   'Até 1 dia': '#fbbf24',
   '2 a 3 dias': '#f97316',
@@ -49,7 +51,7 @@ function StatCard({ label, value, unit, icon, tone = 'slate', hint, to }: { labe
       <span className={clsx('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg', tones[tone])}>{icon}</span>
       <div className="min-w-0">
         <p className="text-xs font-medium text-slate-500">{label}</p>
-        <p className="text-2xl font-bold tabular-nums text-slate-900">{value}</p>
+        <p className="mt-1 text-3xl font-bold tabular-nums text-slate-900">{value}</p>
         <p className="text-[11px] text-slate-400">{unit}</p>
         {hint && <div className="mt-1 text-[11px] text-slate-500">{hint}</div>}
       </div>
@@ -90,6 +92,10 @@ export function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [priority, setPriority] = useState<MovementRow[]>([]);
+  const [confirmationCount, setConfirmationCount] = useState<number | null>(null);
+  const [priorityError, setPriorityError] = useState<string | null>(null);
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [repeatDays, setRepeatDays] = useState(7);
   const [repeat, setRepeat] = useState<{ total: number; items: RepeatAssetWithdrawal[] } | null>(null);
@@ -122,6 +128,7 @@ export function DashboardPage() {
       const d = await getDashboard(filters);
       if (my !== seq.current) return;
       setData(d);
+      setUpdatedAt(new Date());
       setError(null);
     } catch (err) {
       if (my === seq.current) setError(errorMessage(err));
@@ -132,11 +139,44 @@ export function DashboardPage() {
 
   useEffect(() => {
     setLoading(true);
+    setData(null);
+    setUpdatedAt(null);
     void load();
   }, [load]);
+  const prioritySeq = useRef(0);
+  const loadPriority = useCallback(async () => {
+    const my = ++prioritySeq.current;
+    const pending: MovementStatus[] = ['aguardando_assinatura', 'aguardando_aprovacao', 'aguardando_sa', 'sa_informada'];
+    const status = filters.status.length ? pending.filter((v) => filters.status.includes(v)) : pending;
+    try {
+      const [rows, confirmations] = await Promise.all([
+        status.length ? searchMovements({ ...filters, status }, 1, 5, 'movement_at', 'asc') : Promise.resolve({ rows: [] }),
+        !filters.status.length || filters.status.includes('aguardando_assinatura')
+          ? searchMovements({ ...filters, status: ['aguardando_assinatura'] }, 1, 1, 'movement_at', 'asc')
+          : Promise.resolve({ total: 0 }),
+      ]);
+      if (my !== prioritySeq.current) return;
+      setPriority(rows.rows);
+      setConfirmationCount(confirmations.total);
+      setPriorityError(null);
+    } catch (err) {
+      if (my !== prioritySeq.current) return;
+      setPriority([]);
+      setConfirmationCount(null);
+      setPriorityError(errorMessage(err));
+    }
+  }, [filters]);
+  useEffect(() => {
+    setPriority([]);
+    setConfirmationCount(null);
+    setPriorityError(null);
+    void loadPriority();
+    return () => { prioritySeq.current++; };
+  }, [loadPriority]);
   useRealtimeMovements(() => {
     void load();
     void loadRepeat();
+    void loadPriority();
   });
 
   const whNames = useMemo(() => (data?.by_warehouse ?? []).map((w) => w.warehouse), [data]);
@@ -163,14 +203,27 @@ export function DashboardPage() {
   if (loading && !data) return <PageLoader label="Carregando painel…" />;
 
   const c = data?.cards;
+  const overdue = (data?.pending_aging ?? []).filter((v) => v.bucket === 'Mais de 7 dias').reduce((sum, v) => sum + Number(v.mes), 0);
+  const applyPeriod = (from: string, to: string) => setParams(filtersToSearchParams({ ...filters, date_from: from, date_to: to }), { replace: true });
+  const nextAction = (m: MovementRow) => m.status === 'aguardando_assinatura' ? 'Confirmar retirada'
+    : m.status === 'aguardando_aprovacao' ? 'Aprovar ME'
+    : m.status === 'aguardando_sa' ? 'Informar SA' : 'Confirmar baixa no ERP';
+  const statuses = c ? [
+    { label: 'Aguardando confirmação', value: confirmationCount ?? 0, color: '#c58b36' },
+    { label: 'Aguardando aprovação', value: c.aguardando_aprovacao, color: '#b7791f' },
+    { label: 'Pendente SA / ERP', value: c.aguardando_sa + c.sa_informada, color: '#80ad68' },
+    { label: 'Concluídas', value: c.concluida, color: '#4e803d' },
+    { label: 'Canceladas', value: c.cancelada, color: '#94a3b8' },
+    { label: 'Em preparação / outras', value: Math.max(0, c.total_mes - (confirmationCount ?? 0) - c.aguardando_aprovacao - c.aguardando_sa - c.sa_informada - c.concluida - c.cancelada), color: '#64748b' },
+  ].filter((v) => v.value > 0) : [];
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Painel"
+        title="Painel do almoxarifado"
         subtitle={`Olá, ${displayName.split(' ')[0]}. ${
           filters.warehouse_id
             ? `Indicadores do estoque ${warehouses.find((w) => w.id === filters.warehouse_id)?.name ?? ''}.`
-            : 'Indicadores de todos os estoques autorizados (consolidado).'
+            : 'Acompanhe as retiradas e priorize as pendências dos estoques autorizados.'
         }`}
         actions={
           can('createMovement') && (
@@ -181,55 +234,86 @@ export function DashboardPage() {
         }
       />
 
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
+        <div className="flex flex-wrap gap-2" aria-label="Atalhos de período">
+          <Button size="sm" variant="secondary" onClick={() => applyPeriod(todayISO(), todayISO())}>Hoje</Button>
+          <Button size="sm" variant="secondary" onClick={() => applyPeriod(isoDaysAgo(6), todayISO())}>Últimos 7 dias</Button>
+          <Button size="sm" variant="secondary" onClick={() => applyPeriod(firstDayOfMonthISO(), todayISO())}>Este mês</Button>
+          <Button size="sm" variant="ghost" onClick={() => applyPeriod('', '')}>Todo o período</Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <select aria-label="Estoque do painel" className="h-9 max-w-full rounded-lg border border-slate-300 bg-white px-2 text-sm" value={filters.warehouse_id} onChange={(e) => setParams(filtersToSearchParams({ ...filters, warehouse_id: e.target.value }), { replace: true })}>
+            <option value="">Todos os estoques autorizados</option>
+            {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+          </select>
+          <select aria-label="Status do painel" className="h-9 max-w-full rounded-lg border border-slate-300 bg-white px-2 text-sm" value={filters.status.length === 1 ? filters.status[0] : filters.status.length ? 'multiple' : ''} onChange={(e) => setParams(filtersToSearchParams({ ...filters, status: e.target.value ? [e.target.value as MovementStatus] : [] }), { replace: true })}>
+            <option value="">Todos os status</option>
+            {filters.status.length > 1 && <option value="multiple" disabled>Vários status selecionados</option>}
+            {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-slate-500" role="status">
+          <span>{loading ? 'Atualizando…' : updatedAt ? `Atualizado em ${fmtDateTime(updatedAt)}` : 'Dados indisponíveis'}</span>
+          <Button size="sm" variant="ghost" aria-label="Atualizar painel" disabled={loading} icon={<RefreshCw className="h-4 w-4" />} onClick={() => { setLoading(true); void load(); void loadPriority(); void loadRepeat(); }}>Atualizar</Button>
+        </div>
+      </div>
       <FiltersPanel value={filters} onApply={(f) => setParams(filtersToSearchParams(f), { replace: true })} quickSearch={false} />
 
       {error && <Alert tone="error">{error}</Alert>}
 
       {c && data && (
         <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-            <StatCard label="Total de MEs" value={fmtInt(c.total_mes)} unit="MEs (inclui canceladas)" icon={<ClipboardList className="h-5 w-5" />} tone="blue" to={withFilters({})} />
-            <StatCard label="MEs hoje" value={fmtInt(c.today_mes)} unit="MEs" icon={<CalendarDays className="h-5 w-5" />} tone="blue" />
-            {data.by_warehouse.map((w, i) => (
-              <StatCard
-                key={w.warehouse_id}
-                label={`MEs ${w.warehouse}`}
-                value={fmtInt(w.mes)}
-                unit="MEs"
-                icon={<Warehouse className="h-5 w-5" />}
-                tone={i === 0 ? 'blue' : 'teal'}
-                hint={`${fmtInt(w.pending_sa)} aguardando SA`}
-                to={withFilters({ warehouse_id: w.warehouse_id })}
-              />
-            ))}
-            <StatCard label="Itens movimentados" value={fmtInt(c.item_lines)} unit="linhas de itens (sem canceladas)" icon={<Layers className="h-5 w-5" />} />
-            <StatCard
-              label="Quantidades atendidas"
-              value={fmtQty(c.qty_delivered)}
-              unit="soma de unidades diferentes"
-              icon={<Scale className="h-5 w-5" />}
-              hint={data.qty_by_unit.slice(0, 4).map((u) => `${fmtQty(u.qty)} ${u.unit}`).join(' · ')}
-            />
-            <StatCard label="Aguardando SA" value={fmtInt(c.aguardando_sa)} unit="MEs" icon={<Hourglass className="h-5 w-5" />} tone="orange" to={withFilters({ status: ['aguardando_sa'] })} />
-            <StatCard label="Aguardando baixa no ERP" value={fmtInt(c.sa_informada)} unit="MEs" icon={<Hourglass className="h-5 w-5" />} tone="blue" to={withFilters({ status: ['sa_informada'] })} />
-            <StatCard label="Concluídas" value={fmtInt(c.concluida)} unit="MEs" icon={<CheckCheck className="h-5 w-5" />} tone="green" to={withFilters({ status: ['concluida'] })} />
-            <StatCard label="Canceladas" value={fmtInt(c.cancelada)} unit="MEs" icon={<Ban className="h-5 w-5" />} tone="red" to={withFilters({ status: ['cancelada'] })} />
-            {showRepeat && (
-            <StatCard
-              label={`Retiradas repetidas (${repeatDays} dias)`}
-              value={repeat ? fmtInt(repeat.total) : '…'}
-              unit="ativo + material"
-              icon={<AlertTriangle className="h-5 w-5" />}
-              tone={repeat && repeat.total > 0 ? 'amber' : 'green'}
-              to="#retiradas-repetidas"
-            />
-            )}
-            {c.aguardando_aprovacao > 0 && (
-              <StatCard label="Aguardando aprovação" value={fmtInt(c.aguardando_aprovacao)} unit="MEs" icon={<ShieldQuestion className="h-5 w-5" />} tone="amber" to={withFilters({ status: ['aguardando_aprovacao'] })} />
-            )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <StatCard label="MEs no período" value={fmtInt(c.total_mes)} unit={`${fmtInt(c.today_mes)} hoje no recorte selecionado`} icon={<ClipboardList className="h-5 w-5" />} tone="blue" to={withFilters({})} />
+            <StatCard label="Aguardando confirmação" value={confirmationCount === null ? '—' : fmtInt(confirmationCount)} unit="retiradas a confirmar" icon={<CalendarDays className="h-5 w-5" />} tone="orange" to={withFilters({ status: ['aguardando_assinatura'] })} />
+            <StatCard label="Pendentes SA / ERP" value={fmtInt(c.aguardando_sa + c.sa_informada)} unit={`${fmtInt(c.aguardando_sa)} SA · ${fmtInt(c.sa_informada)} baixa ERP`} icon={<Hourglass className="h-5 w-5" />} tone="orange" to={withFilters({ status: ['aguardando_sa', 'sa_informada'] })} />
+            <StatCard label="SA há mais de 7 dias" value={fmtInt(overdue)} unit="MEs aguardando SA no recorte" icon={<AlertTriangle className="h-5 w-5" />} tone={overdue ? 'red' : 'green'} to="#pendencias-prioritarias" />
+            <StatCard label="Concluídas no período" value={fmtInt(c.concluida)} unit="MEs finalizadas" icon={<CheckCheck className="h-5 w-5" />} tone="green" to={withFilters({ status: ['concluida'] })} />
           </div>
+          <p className="text-xs text-slate-500">Todos os indicadores respeitam os filtros acima. Clique nos cartões para consultar as MEs.</p>
 
-          {showRepeat && <RepeatAssetCard data={repeat} loading={repeatLoading} days={repeatDays} onDaysChange={setRepeatDays} />}
+          <section id="pendencias-prioritarias" className="scroll-mt-20">
+            <Card>
+              <CardHeader title="Pendências que precisam de atenção" subtitle="As cinco MEs pendentes mais antigas no recorte selecionado. Tempo contado desde a movimentação." actions={<LinkButton size="sm" variant="secondary" to={withFilters({ status: ['aguardando_assinatura', 'aguardando_aprovacao', 'aguardando_sa', 'sa_informada'] })}>Ver pendências</LinkButton>} />
+              {priorityError ? <Alert tone="error">Não foi possível consultar as pendências: {priorityError}</Alert> : confirmationCount === null ? <p className="py-6 text-sm text-slate-500">Carregando pendências…</p> : priority.length === 0 ? <p className="py-6 text-sm text-emerald-700">Nenhuma pendência encontrada com estes filtros.</p> : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[700px] text-left text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr>{['ME', 'Tempo em espera', 'Funcionário', 'Estoque', 'Próxima ação', 'Consulta'].map((h) => <th key={h} className="px-3 py-3">{h}</th>)}</tr></thead>
+                    <tbody className="divide-y divide-slate-100">{priority.map((m) => <tr key={m.id}>
+                      <td className="px-3 py-4 font-mono font-semibold text-brand-700"><Link to={`/movimentacoes/${m.id}`}>{m.me_number}</Link></td>
+                      <td className="px-3 py-4"><span className={clsx('rounded-full px-2 py-1 text-xs font-semibold', daysSince(m.movement_at) >= 2 ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-800')}>{fmtRelative(m.movement_at)}</span></td>
+                      <td className="px-3 py-4">{m.requester_name}</td><td className="px-3 py-4">{m.warehouse_name}</td>
+                      <td className="px-3 py-4">{nextAction(m)}<span className="block text-xs text-slate-400">{STATUS_LABELS[m.status]}</span></td>
+                      <td className="px-3 py-4"><LinkButton size="sm" variant="secondary" to={`/movimentacoes/${m.id}`}>Abrir ME</LinkButton></td>
+                    </tr>)}</tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </section>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ChartCard title="Situação das MEs" subtitle="Quantidade de MEs por etapa, no período e nos filtros selecionados.">
+              {confirmationCount === null ? <p className="py-16 text-center text-sm text-slate-500">Distribuição indisponível enquanto a confirmação não for consultada.</p> : c.total_mes === 0 ? <p className="py-16 text-center text-sm text-slate-500">Sem movimentações no período.</p> : <ResponsiveContainer>
+                <BarChart data={statuses} layout="vertical" margin={{ left: 0, right: 24 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="label" width={145} tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(v) => [`${v} MEs`, 'Quantidade']} />
+                  <Bar dataKey="value" isAnimationActive={false} radius={[0, 4, 4, 0]}>{statuses.map((v) => <Cell key={v.label} fill={v.color} />)}</Bar>
+                </BarChart>
+              </ResponsiveContainer>}
+            </ChartCard>
+            <ChartCard title="Materiais mais retirados" subtitle="Número de linhas de retirada por material; não soma unidades diferentes.">
+              {data.top_materials_lines.length === 0 ? <p className="py-16 text-center text-sm text-slate-500">Sem materiais no período.</p> : <ResponsiveContainer>
+                <BarChart data={data.top_materials_lines.slice(0, 5).map((r) => ({ ...r, nome: short(r.material) }))} layout="vertical" margin={{ left: 0, right: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} /><YAxis type="category" dataKey="nome" width={140} tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(v) => [`${v} linhas de retirada`, 'Frequência']} labelFormatter={(_, p) => p?.[0]?.payload?.material ?? ''} />
+                  <Bar isAnimationActive={false} dataKey="lines" fill="#4e803d" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>}
+            </ChartCard>
+          </div>
 
           <Card>
             <CardHeader
@@ -271,6 +355,11 @@ export function DashboardPage() {
             </div>
           </Card>
 
+          <details className="rounded-xl border border-slate-200 bg-white p-4">
+            <summary className="cursor-pointer font-semibold text-brand-800">Análises detalhadas por estoque, material, setor e usuário</summary>
+            <div className="mt-4">
+              {showRepeat && <RepeatAssetCard data={repeat} loading={repeatLoading} days={repeatDays} onDaysChange={setRepeatDays} />}
+            </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <ChartCard title="Comparação entre estoques" subtitle="MEs, linhas de itens e pendências de SA por estoque (cada série em sua unidade).">
               <ResponsiveContainer>
@@ -280,8 +369,8 @@ export function DashboardPage() {
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                   <Tooltip cursor={{ fill: '#f1f5f9' }} />
                   <Legend />
-                  <Bar isAnimationActive={false} dataKey="mes" name="MEs" fill="#1d43c4" radius={[3, 3, 0, 0]} />
-                  <Bar isAnimationActive={false} dataKey="item_lines" name="Linhas de itens" fill="#93b4fd" radius={[3, 3, 0, 0]} />
+                  <Bar isAnimationActive={false} dataKey="mes" name="MEs" fill="#4e803d" radius={[3, 3, 0, 0]} />
+                  <Bar isAnimationActive={false} dataKey="item_lines" name="Linhas de itens" fill="#a8c795" radius={[3, 3, 0, 0]} />
                   <Bar isAnimationActive={false} dataKey="pending_sa" name="Aguardando SA" fill="#f97316" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -316,7 +405,7 @@ export function DashboardPage() {
                   <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
                   <YAxis type="category" dataKey="nome" width={150} tick={{ fontSize: 11 }} />
                   <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(v) => [`${v} linhas`, 'Saídas']} labelFormatter={(_, p) => p?.[0]?.payload?.material ?? ''} />
-                  <Bar isAnimationActive={false} dataKey="lines" fill="#1d43c4" radius={[0, 3, 3, 0]} />
+                  <Bar isAnimationActive={false} dataKey="lines" fill="#4e803d" radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
               )}
@@ -332,7 +421,7 @@ export function DashboardPage() {
                   <XAxis type="number" tick={{ fontSize: 11 }} />
                   <YAxis type="category" dataKey="nome" width={170} tick={{ fontSize: 11 }} />
                   <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(v, _n, p) => [`${fmtQty(Number(v))} ${p?.payload?.unit ?? ''}`, 'Atendido']} labelFormatter={(_, p) => p?.[0]?.payload?.material ?? ''} />
-                  <Bar isAnimationActive={false} dataKey="qty" fill="#0d9488" radius={[0, 3, 3, 0]} />
+                  <Bar isAnimationActive={false} dataKey="qty" fill="#669e50" radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
               )}
@@ -355,13 +444,14 @@ export function DashboardPage() {
                       <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
                       <YAxis type="category" dataKey="nome" width={170} tick={{ fontSize: 11 }} />
                       <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(v) => [`${v} MEs`]} labelFormatter={(_, p) => p?.[0]?.payload?.label ?? ''} />
-                      <Bar isAnimationActive={false} dataKey="mes" fill="#3b6ef5" radius={[0, 3, 3, 0]} />
+                      <Bar isAnimationActive={false} dataKey="mes" fill="#4e803d" radius={[0, 3, 3, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
               </ChartCard>
             ))}
           </div>
+          </details>
           {warehouses.length === 0 && <Alert tone="warning">Você não tem estoques vinculados; os indicadores ficarão vazios.</Alert>}
         </>
       )}
