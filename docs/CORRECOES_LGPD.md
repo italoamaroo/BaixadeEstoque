@@ -74,3 +74,11 @@ O arquivo `07k` é a cópia usada em instalações novas. A política é lida do
 Verificação após aplicar: `select public.movement_retention_summary();` deve ser chamada com sessão de gestor/admin autorizada; para testar pelo SQL Editor sem sessão de aplicação, prefira validar a existência das funções com `to_regprocedure` e conferir o painel com login real.
 
 O registro anterior como proposta é o histórico da decisão. A implementação técnica desta seção não presume validação jurídica das demais categorias.
+
+## Identificação de privacidade informada pelo responsável (19/11/2026)
+
+- **Controlador informado:** ITALO BRITO AMARO DA SILVA.
+- **Canal de atendimento aos titulares:** ainda não informado.
+- **Encarregado, se aplicável:** ainda não definido neste registro; a indicação de controlador não equivale à designação de encarregado.
+
+A identificação acima registra a declaração do responsável pelo projeto. É necessário confirmar se Italo atua como controlador em nome próprio ou como representante da pessoa jurídica que decide as finalidades e os meios do tratamento; nesse último caso, identificar também a razão social e o CNPJ da entidade controladora. Este registro documental não altera automaticamente a configuração LGPD no Supabase nem comprova publicação do aviso de privacidade.
