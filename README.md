@@ -21,6 +21,10 @@ Em banco existente, publique o front-end e configure/verifique MFA dos administr
 antes de executar `supabase/sql/27_endurecimento_lgpd.sql`.
 Não reaplique todo o instalador em produção para esta atualização.
 
+A guarda de MEs e comprovantes por 10 anos desde conclusão/cancelamento usa
+`supabase/sql/28_retencao_mes.sql`, após a migração 27. O prazo é consultável na
+ME e em Segurança; não há exclusão automática. Ver `docs/CORRECOES_LGPD.md`.
+
 ## 1. Visão geral
 
 | Perfil | O que faz |
