@@ -43,3 +43,18 @@ Não apaga MEs, assinaturas, fotos, modelos faciais ou retiradas offline pendent
 - Suíte SQL inclui tentativas diretas sem papel, leitura de e-mail, admin AAL1/ausência de claim, AAL2, limites de cálculo, equipe SA sem assinatura/PDF e protocolo de exportação.
 - Suítes existentes simulam admin já autenticado com AAL2; a suíte de endurecimento sobrescreve o claim para testar negações. Nenhum claim padrão foi adicionado à aplicação ou ao banco real.
 - Testes frontend cobrem gate MFA, fila sem conta, isolamento da listagem, limpeza de rascunhos e limites de planilhas.
+
+## Proposta de retenção definida pelo responsável (19/11/2026)
+
+O responsável pelo projeto solicitou prazo de **10 anos** para guarda dos dados e confirmou os seguintes marcos para movimentações:
+
+| Categoria | Prazo solicitado | Início da contagem |
+|---|---|---|
+| ME concluída e seus itens, registros de SA, fotos e assinaturas vinculados | 10 anos | Data de conclusão da ME (`completed_at`) |
+| ME cancelada e seus itens, registros de SA, fotos e assinaturas vinculados | 10 anos | Data de cancelamento da ME (`cancelled_at`) |
+| ME ainda não concluída nem cancelada | Não iniciar a contagem pelo critério acima | Aguardar o evento aplicável; revisar pendências antigas para evitar conservação sem necessidade |
+| Cadastros faciais, tentativas, logs e incidentes sem vínculo direto com uma ME | 10 anos é a proposta solicitada, ainda sujeita a validação por categoria | Marco específico ainda não definido; não atribuir artificialmente uma conclusão de ME |
+
+**Estado:** decisão de negócio registrada como proposta de política, sem validação jurídica presumida e sem alteração técnica dos prazos no Supabase. A aplicação geral a dados biométricos depende de comprovação de necessidade e base legal; a representação numérica do rosto continua sendo dado biométrico sensível. As regras vigentes de remoção do modelo facial ao inativar o funcionário não foram modificadas por este registro.
+
+Antes de implementar descarte ou retenção: aprovar finalidade, necessidade, prazos e marcos por categoria com o jurídico; definir tratamento de retenção legal, backups e cópias; testar a execução. Este registro não autoriza guardar dados offline no aparelho por 10 anos: a fila pendente deve ser reconciliada e sua retenção local definida separadamente.
