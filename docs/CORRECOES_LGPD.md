@@ -30,7 +30,7 @@ Não apaga MEs, assinaturas, fotos, modelos faciais ou retiradas offline pendent
 | Tema | Responsável e próxima ação |
 |---|---|
 | A1/A2: biometria, base legal, necessidade, inventário e RIPD | Empresa/RH/jurídico: aprovar finalidades 1:N e 1:1, alternativas, hipótese legal aplicável, avisos e avaliação de risco. Não ampliar o uso antes dessa decisão. |
-| A3/M2: retenção de modelos, tentativas e fila | Empresa/jurídico: aprovar prazos e exceções. Depois implementar expiração, eliminação/anonimização e cobertura de backups. Nenhum prazo legal foi inventado neste PR. |
+| A3/M2: retenção de modelos, tentativas e fila | Prazo de 10 anos confirmado pelo responsável também para cadastros faciais, logs, dados offline e backups. Definir os marcos das categorias sem conclusão de ME e implementar a política; prazo escolhido não equivale a prazo legal obrigatório. |
 | Prova de vida | Continua sendo verificada no navegador e informada ao servidor. Não foi integrada solução de prova de vida independente nem criado atestado de identidade/recebimento. Depende de escolha de fornecedor, contrato, custos e dados permitidos. |
 | M7/M8/M9 | Preencher controlador/canal, aprovar documentos, testar pedidos de titulares, confirmar pg_cron/contingência e protocolos de comunicação de incidentes. |
 | M10/B10 | Conferir regiões, contratos, suboperadores, mecanismos de transferência quando aplicáveis, backups/PITR, RPO/RTO e restauração. |
@@ -87,6 +87,15 @@ Dados informados pelo responsável e com publicação no repositório público `
 
 Esta identificação substitui o registro anterior que indicava Italo como controlador em nome próprio. A entidade controladora informada é o Consórcio; Italo foi indicado como encarregado. A indicação no sistema não comprova, por si só, designação formal do encarregado, validade cadastral do CNPJ ou publicação do aviso aos titulares. Não se presume atendimento por WhatsApp pelo simples fornecimento do telefone.
 
-A imagem fornecida evidencia o preenchimento dos campos, sem comprovar que a configuração foi salva no banco. Esta atualização registra os dados na documentação; não altera automaticamente a configuração do Supabase.
+Após aplicar `supabase/operacoes/definir_responsaveis_privacidade.sql`, o responsável forneceu imagem do resultado da consulta no Supabase com os dados de identificação e contato. Essa evidência confirma a gravação apresentada, sem representar auditoria independente do ambiente.
 
-O responsável também informou a existência de documento assinado do DP para reconhecimento facial no controle de ponto. O documento não foi examinado; sua abrangência para identificação e confirmação de retirada de materiais e para compartilhamento da base facial permanece pendente de verificação. Essa informação não equivale à validação jurídica do uso no almoxarifado.
+O responsável confirmou a existência de termo assinado do DP e declarou expressamente que ele também abrange o reconhecimento facial para retirada de materiais. A existência e a abrangência declaradas ficam registradas; não se solicita nova confirmação desses fatos. O documento não foi examinado nesta revisão; a confirmação não constitui análise de seu conteúdo, da hipótese legal ou da necessidade do tratamento, nem comprova a designação formal do encarregado.
+
+
+## Atualização da decisão de retenção (19/11/2026)
+
+O responsável confirmou **o mesmo prazo de 10 anos** para cadastros faciais, logs, dados offline e backups, além das MEs e seus comprovantes. Esta decisão substitui a pendência de escolha do prazo dessas quatro categorias na proposta anterior. Não se trata de prazo legal obrigatório presumido.
+
+A contagem de documentos vinculados à ME continua desde sua conclusão ou, se cancelada, desde o cancelamento. Para cadastros e registros sem vínculo com uma ME, o evento inicial ainda precisa ser definido: não existe uma conclusão de ME única que possa ser presumida. O tratamento de backups com dados de várias movimentações também depende dessa definição.
+
+**Situação técnica:** a regra implementada pela migração 28 continua limitada às MEs e comprovantes. Este registro não modifica a remoção de modelos faciais, a expiração de logs, a limpeza de dados locais nem a política do provedor de backups. A guarda central de um registro originado offline e a permanência de sua cópia no aparelho são controles distintos; falta definir como executar a decisão para cada um.
