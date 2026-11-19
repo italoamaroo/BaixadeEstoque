@@ -66,6 +66,21 @@ drop trigger if exists face_attempts_retention on public.face_attempts;
 create trigger face_attempts_retention before delete on public.face_attempts
 for each row execute function public.protect_face_attempt_retention();
 
+-- Contadores legados de falha de login não podem ser limpos em sete dias.
+-- A função pública de relato permanece revogada pela migração 27.
+create or replace function public.protect_auth_failure_retention()
+returns trigger language plpgsql security definer set search_path=public,pg_temp as $$
+begin
+  if public.retention_created_until(old.window_start)>now() then
+    raise exception 'Registro de falha de login em guarda por 10 anos.' using errcode='42501';
+  end if;
+  return old;
+end; $$;
+revoke all on function public.protect_auth_failure_retention() from public, anon, authenticated;
+drop trigger if exists auth_login_failures_retention on public.auth_login_failures;
+create trigger auth_login_failures_retention before delete on public.auth_login_failures
+for each row execute function public.protect_auth_failure_retention();
+
 -- Congela o marco original dos modelos; recadastro gera novos IDs.
 create or replace function public.protect_face_creation()
 returns trigger language plpgsql set search_path = public, pg_temp as $$
@@ -145,6 +160,7 @@ begin
     union all select 'cadastros_faciais',created_at from public.employee_faces_archive
     union all select 'logs',occurred_at from public.audit_logs where purged_at is null and movement_id is null
     union all select 'tentativas_faciais',created_at from public.face_attempts
+    union all select 'falhas_login_legadas',window_start from public.auth_login_failures
     union all select 'backups',created_at from public.retention_backups
   ), totals as (
     select category,count(*) total,

@@ -6,7 +6,7 @@ import { Alert, Card, CardHeader } from './ui/Card';
 
 const labels: Record<string, string> = {
   cadastros_faciais: 'Cadastros faciais (atuais e arquivados)',
-  logs: 'Logs da aplicação sem vínculo com ME', tentativas_faciais: 'Tentativas faciais', backups: 'Backups registrados',
+  logs: 'Logs da aplicação sem vínculo com ME', falhas_login_legadas: 'Contadores legados de falhas de login', tentativas_faciais: 'Tentativas faciais', backups: 'Backups registrados',
 };
 export function AdditionalRetentionCard() {
   const [data, setData] = useState<AdditionalRetentionSummary | null>(null);

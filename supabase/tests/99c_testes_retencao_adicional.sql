@@ -20,6 +20,8 @@ values(now()-interval '11 years','retencao.fixture','fixture','privacidade',:'op
 select testes.igual(exists(select 1 from public._purge_candidates('privacidade',current_date) x where x=:linked),false,'log antigo de ME aberta não pode ser descartado');
 insert into public.face_attempts(result) values('sem_rosto') returning id as attempt \gset
 select testes.falha(format('delete from public.face_attempts where id=%s',:attempt),'10 anos');
+insert into public.auth_login_failures(email_hash,window_start) values('fixture-retencao',now()-interval '8 days');
+select testes.falha($$delete from public.auth_login_failures where email_hash='fixture-retencao'$$,'10 anos');
 set local role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a',true);
 select testes.falha('select descriptor from public.employee_faces_archive','permission denied');
