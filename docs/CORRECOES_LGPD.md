@@ -34,7 +34,7 @@ Não apaga MEs, assinaturas, fotos, modelos faciais ou retiradas offline pendent
 | Prova de vida | Continua sendo verificada no navegador e informada ao servidor. Não foi integrada solução de prova de vida independente nem criado atestado de identidade/recebimento. Depende de escolha de fornecedor, contrato, custos e dados permitidos. |
 | M7/M8/M9 | Preencher controlador/canal, aprovar documentos, testar pedidos de titulares, confirmar pg_cron/contingência e protocolos de comunicação de incidentes. |
 | M10/B10 | Conferir regiões, contratos, suboperadores, mecanismos de transferência quando aplicáveis, backups/PITR, RPO/RTO e restauração. |
-| M11 | Decidir catálogo de materiais global ou segregado antes de alterar RLS de cadastro. |
+| M11 — decisão registrada em 19/11/2026 | Catálogo de materiais compartilhado entre Muribeca e Dois Irmãos, conforme definição do responsável pelo projeto. Consulta para usuários ativos com papel autorizado; alterações e importações continuam dependentes das permissões de cadastro. MEs e movimentações permanecem restritas aos estoques autorizados. Ver [decisão na arquitetura](ARQUITETURA.md#decisão-de-negócio-catálogo-compartilhado-19112026). A escolha de negócio está resolvida; a validação operacional das policies permanece pendente. |
 | B12 | O cenário vulnerável Node.js não foi demonstrado no PDF browser; atualização de jsPDF e revisão de advisories ficam para verificação específica de dependências. |
 | Produção | Confirmar migrations, grants, default privileges, Auth, expiração/revogação de sessão, Storage e políticas realmente aplicados. Este PR não acessou o banco remoto. |
 
