@@ -10,3 +10,6 @@ supabase/.temp
 tests/e2e/capturas
 tests/e2e/.arquivos
 supabase/instalar_completo.sql.bak
+
+__pycache__/
+*.pyc

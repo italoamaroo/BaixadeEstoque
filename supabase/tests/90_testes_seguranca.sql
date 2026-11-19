@@ -105,12 +105,15 @@ select testes.igual((select status || '|' || resolution from public.security_ale
 select testes.igual((select count(*) from public.audit_logs where action = 'alerta.atualizado' and entity_id = :'alerta')::int, 2, 'tratamento registrado na auditoria');
 
 -- 9) Retenção, retenção legal e descarte com dupla aprovação
---    eventos antigos de autenticação (inseridos pelo dono do banco)
+--    eventos anteriores aos dez anos (inseridos pelo dono do banco)
+-- Fixture explícita para exercitar a edição/aprovação de propostas legadas.
+update public.audit_retention_policies set status='proposta' where category='autenticacao';
+update public.audit_retention_policies set retain_days=null,status='proposta' where category='dados';
 insert into public.audit_logs (occurred_at, action, entity, entity_id, new_data, ip_address, category, result, severity, schema_version)
-values (now() - interval '400 days', 'auth.login', 'auth', 'antigo-1', '{"x":1}', '1.1.1.1', 'autenticacao', 'sucesso', 'aviso', 2),
-       (now() - interval '399 days', 'auth.login', 'auth', 'antigo-2', '{"x":2}', '1.1.1.2', 'autenticacao', 'sucesso', 'aviso', 2),
-       (now() - interval '398 days', 'auth.login', 'auth', 'antigo-3', '{"x":3}', '1.1.1.3', 'autenticacao', 'sucesso', 'aviso', 2);
-select (now() - interval '398 days')::date as dia_retido \gset
+values (now() - interval '4000 days', 'auth.login', 'auth', 'antigo-1', '{"x":1}', '1.1.1.1', 'autenticacao', 'sucesso', 'aviso', 2),
+       (now() - interval '3999 days', 'auth.login', 'auth', 'antigo-2', '{"x":2}', '1.1.1.2', 'autenticacao', 'sucesso', 'aviso', 2),
+       (now() - interval '3998 days', 'auth.login', 'auth', 'antigo-3', '{"x":3}', '1.1.1.3', 'autenticacao', 'sucesso', 'aviso', 2);
+select (now() - interval '3998 days')::date as dia_retido \gset
 
 begin;
 set local role authenticated;

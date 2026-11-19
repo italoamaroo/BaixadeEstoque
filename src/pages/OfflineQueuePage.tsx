@@ -6,6 +6,7 @@ import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { CACHE_VALID_MS, cacheInfo, refreshOfflineCache, type OfflineCacheInfo } from '@/lib/offlineCache';
 import { discardQueued, syncQueue, type QueuedMovement } from '@/lib/offlineQueue';
+import { canReviewLocalRetention, createdRetentionUntil } from '@/lib/retention';
 import { errorMessage } from '@/lib/errors';
 import { fmtDateTime, fmtInt } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
@@ -72,6 +73,7 @@ export function OfflineQueuePage() {
         </Alert>
       )}
 
+      <Alert tone="info">Saídas ainda não enviadas ficam em guarda por 10 anos desde a criação, sem exclusão automática. Após o envio, o registro e a assinatura são preservados junto da ME e a cópia de transporte sai deste aparelho. O navegador pode perder dados se for limpo; sincronize assim que possível.</Alert>
       <Card padded={false}>
         {error ? (
           <div className="p-4"><Alert tone="error">Não foi possível consultar as saídas guardadas. Reabra esta tela para tentar novamente.</Alert></div>
@@ -90,6 +92,7 @@ export function OfflineQueuePage() {
                   <p className="text-sm text-slate-600">
                     Retirada em {fmtDateTime(q.offline_at)} · {fmtInt(q.item_count)} item(ns): {q.items_summary}
                   </p>
+                  <p className="text-xs text-slate-500">Guarda até: {createdRetentionUntil(q.saved_at) ? fmtDateTime(createdRetentionUntil(q.saved_at)) : 'data de criação exige conferência'}</p>
                   <p className="font-mono text-xs text-slate-400">Identificador provisório {q.id.slice(0, 8).toUpperCase()}</p>
                   {q.status === 'erro' ? (
                     <p className="mt-1 text-sm font-medium text-red-700">Não enviada: {q.last_error}</p>
@@ -99,8 +102,8 @@ export function OfflineQueuePage() {
                     </p>
                   )}
                 </div>
-                <Button variant="ghost" size="sm" icon={<Trash2 className="h-4 w-4" />} onClick={() => setDiscard(q)}>
-                  Descartar
+                <Button variant="ghost" size="sm" icon={<Trash2 className="h-4 w-4" />} disabled={!canReviewLocalRetention(q.saved_at)} onClick={() => setDiscard(q)}>
+                  Revisar descarte
                 </Button>
               </li>
             ))}
@@ -139,7 +142,7 @@ export function OfflineQueuePage() {
         open={Boolean(discard)}
         onClose={() => setDiscard(null)}
         title="Descartar saída guardada?"
-        description="Ela será apagada deste aparelho e NÃO será enviada. Use só se ela já foi lançada de outra forma (por exemplo, em papel)."
+        description="O prazo de 10 anos foi cumprido. Confira impedimentos e a necessidade de conservação antes de apagar esta saída ainda não enviada."
         footer={
           <>
             <Button variant="secondary" onClick={() => setDiscard(null)}>
@@ -149,7 +152,7 @@ export function OfflineQueuePage() {
               variant="danger"
               onClick={async () => {
                 if (!discard) return;
-                await discardQueued(discard.id);
+                try { await discardQueued(discard.id); } catch (e) { toast.error(errorMessage(e)); return; }
                 toast.success('Saída descartada do aparelho.');
                 setDiscard(null);
               }}

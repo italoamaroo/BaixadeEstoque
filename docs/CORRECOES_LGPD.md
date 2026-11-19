@@ -104,3 +104,10 @@ A contagem de documentos vinculados à ME continua desde sua conclusão ou, se c
 ### Marco confirmado para registros sem ME (19/11/2026)
 
 Decisão do responsável: **10 anos desde a data de criação** para cadastros faciais, logs, dados offline e backups sem vínculo direto com ME. Esta decisão resolve a pendência do marco inicial dessas categorias nas seções anteriores. MEs e comprovantes vinculados mantêm o marco de conclusão/cancelamento já implementado. Registros sem data de criação confiável exigem conferência; não inventar datas. A confirmação registra a política, sem afirmar que sua implementação técnica ou a retenção do provedor de backups já foi alterada.
+
+
+## Implementação da guarda adicional — migração 29
+
+Implementados arquivo facial isolado do reconhecimento com criação original, piso de dez anos civis para descarte de logs (sem reduzir a guarda de logs vinculados a MEs), bloqueio de exclusão antecipada de tentativas faciais e de saídas offline pendentes pela interface, resumo administrativo com MFA e inventário de backups efetivamente gerados. Cópias temporárias de acesso continuam com validade própria; após sincronização, a evidência offline passa à ME.
+
+A regra depende de aplicar `supabase/sql/29_retencao_adicional.sql` em produção. O script `scripts/backup-retention.py` e o procedimento de restauração estão preparados, mas destino externo, credenciais, agendamento e teste real de recuperação dependem do operador. Não foi configurada retenção nos provedores nem executado backup de produção. Detalhes e limitações: [RETENCAO_ADICIONAL.md](RETENCAO_ADICIONAL.md). As pendências históricas de implementação acima devem ser lidas à luz desta seção.

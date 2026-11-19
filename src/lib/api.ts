@@ -1085,3 +1085,14 @@ export interface MovementRetentionSummary {
 }
 export const getMovementRetention = (id: string) => rpc<MovementRetention>('movement_retention_status', { p_movement_id: id });
 export const getMovementRetentionSummary = () => rpc<MovementRetentionSummary>('movement_retention_summary');
+
+
+export interface AdditionalRetentionSummary {
+  years: number;
+  basis_event: 'criacao';
+  automatic_deletion: boolean;
+  categories: Record<string, { total: number; review_due: number; next_review_at: string | null }>;
+  backup_provider_configured: boolean;
+  offline_scope: string;
+}
+export const getAdditionalRetentionSummary = () => rpc<AdditionalRetentionSummary>('additional_retention_summary');
