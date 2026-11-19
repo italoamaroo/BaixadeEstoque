@@ -1,3 +1,4 @@
+import { MovementRetentionCard } from '@/components/MovementRetentionCard';
 import { AdminMfaGate } from '@/components/AdminMfaGate';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -146,6 +147,8 @@ function SecurityContent() {
           )}
         </div>
       </Card>
+
+      <MovementRetentionCard />
 
       {tabs.length > 1 && (
         <div role="tablist" className="flex flex-wrap gap-1 border-b border-slate-200">

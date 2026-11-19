@@ -58,3 +58,19 @@ O responsável pelo projeto solicitou prazo de **10 anos** para guarda dos dados
 **Estado:** decisão de negócio registrada como proposta de política, sem validação jurídica presumida e sem alteração técnica dos prazos no Supabase. A aplicação geral a dados biométricos depende de comprovação de necessidade e base legal; a representação numérica do rosto continua sendo dado biométrico sensível. As regras vigentes de remoção do modelo facial ao inativar o funcionário não foram modificadas por este registro.
 
 Antes de implementar descarte ou retenção: aprovar finalidade, necessidade, prazos e marcos por categoria com o jurídico; definir tratamento de retenção legal, backups e cópias; testar a execução. Este registro não autoriza guardar dados offline no aparelho por 10 anos: a fila pendente deve ser reconciliada e sua retenção local definida separadamente.
+
+## Aplicação técnica da guarda de MEs — migração 28
+
+O prazo solicitado para MEs e comprovantes foi implementado em `supabase/sql/28_retencao_mes.sql` (aplicar depois da migração 27).
+O arquivo `07k` é a cópia usada em instalações novas. A política é lida do banco pelas RPCs `movement_retention_status` e `movement_retention_summary`, e exibida no detalhe da ME e na tela Segurança.
+
+- Prazo de **10 anos civis**, calculado no fuso configurado da aplicação desde `completed_at` ou, em MEs canceladas, desde `cancelled_at`.
+- Aplica-se também às MEs existentes, sem alterar suas datas, arquivos, itens ou histórico. Uma correção de material não reinicia a contagem; o prazo é derivado da data de encerramento registrada.
+- MEs abertas aguardam encerramento. MEs encerradas sem data válida ficam pendentes de conferência, sem data final inventada.
+- O fim do prazo sinaliza revisão pendente. Exclusões físicas continuam bloqueadas; esta migração não implementa descarte automático. Antes de qualquer eliminação, conferir necessidade, impedimentos e retenção legal.
+- Os comprovantes seguem a ME, sem criar um prazo próprio a partir do upload. Não altera biometria, logs de segurança, incidentes, backups ou fila offline.
+- O painel mostra pendência de migração enquanto a RPC não existir: publicar o site não aplica o SQL no Supabase.
+
+Verificação após aplicar: `select public.movement_retention_summary();` deve ser chamada com sessão de gestor/admin autorizada; para testar pelo SQL Editor sem sessão de aplicação, prefira validar a existência das funções com `to_regprocedure` e conferir o painel com login real.
+
+O registro anterior como proposta é o histórico da decisão. A implementação técnica desta seção não presume validação jurídica das demais categorias.

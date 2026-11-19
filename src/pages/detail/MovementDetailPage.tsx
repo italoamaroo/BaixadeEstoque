@@ -1,3 +1,4 @@
+import { MovementRetentionCard } from '@/components/MovementRetentionCard';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -429,6 +430,7 @@ export function MovementDetailPage() {
             )}
           </Card>
           <IdentificationCard movementId={m.id} />
+          <MovementRetentionCard movementId={m.id} />
           {can('viewRequesterPhoto') && <RequesterPhotoCard movementId={m.id} />}
         </div>
 

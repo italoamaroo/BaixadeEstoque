@@ -1063,3 +1063,25 @@ export const movementIdentification = (movementId: string) =>
     semelhanca_confirmacao: number | null;
   } | null>('movement_identification', { p_movement_id: movementId });
 export const counterTerminalWarehouses = () => rpc<{ id: string; name: string }[]>('counter_terminal_warehouses');
+
+
+export interface MovementRetention {
+  movement_id: string;
+  years: number;
+  basis_event: 'conclusao' | 'cancelamento' | null;
+  started_at: string | null;
+  retain_until: string | null;
+  state: 'aguardando_encerramento' | 'data_de_encerramento_ausente' | 'revisao_pendente' | 'em_guarda';
+  automatic_deletion: boolean;
+}
+export interface MovementRetentionSummary {
+  years: number;
+  awaiting_closure: number;
+  missing_date: number;
+  retained: number;
+  review_due: number;
+  next_review_at: string | null;
+  automatic_deletion: boolean;
+}
+export const getMovementRetention = (id: string) => rpc<MovementRetention>('movement_retention_status', { p_movement_id: id });
+export const getMovementRetentionSummary = () => rpc<MovementRetentionSummary>('movement_retention_summary');
