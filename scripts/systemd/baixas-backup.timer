@@ -1,0 +1,11 @@
+[Unit]
+Description=Backup diário do Baixas de Estoque às 02h de Fortaleza
+
+[Timer]
+OnCalendar=*-*-* 02:00:00 America/Fortaleza
+# Em caso de desligamento, executar a rotina pendente ao ligar.
+Persistent=true
+Unit=baixas-backup.service
+
+[Install]
+WantedBy=timers.target
