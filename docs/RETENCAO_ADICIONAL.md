@@ -51,3 +51,44 @@ O programa não agenda tarefas, não apaga backups e não transmite o arquivo pa
 ## Teste de restauração
 
 Em ambiente isolado, sem usuários reais conectados: decifrar com a chave privada, verificar os hashes do manifesto, restaurar `database.dump` com `pg_restore` em PostgreSQL compatível e restaurar cada objeto ao bucket/caminho do manifesto. Conferir permissões privadas, referências de assinaturas/fotos, consulta de uma ME e integridade da auditoria. Uma lista de backups ou arquivo cifrado, sozinha, não comprova restauração.
+
+## Padrão operacional definido em 21/11/2026
+
+Por solicitação do responsável, este é o padrão adotado para preparar a operação:
+
+| Item | Padrão |
+|---|---|
+| Frequência | Uma cópia completa por dia, às **02h, America/Fortaleza** |
+| Conteúdo | Banco PostgreSQL e todos os objetos do Storage, incluindo assinaturas e fotos |
+| Prazo | **10 anos desde a criação de cada cópia**, sem descarte automático |
+| Proteção | Criptografia GPG antes da guarda; chave privada de recuperação separada |
+| Destino | Armazenamento externo privado montado em `/mnt/baixas-backups`, separado da hospedagem do site |
+| Integridade | Manifesto e SHA-256 do arquivo registrados pelo gerador |
+| Conferência | Diária: resultado da execução e disponibilidade da cópia externa |
+| Restauração | Primeiro teste antes da ativação operacional e, depois, mensalmente em ambiente isolado |
+| Objetivo de perda máxima de dados (RPO) | Até 24 horas, desde que as cópias diárias estejam concluídas e utilizáveis; objetivo, não garantia já comprovada |
+| Falha | Investigar e reexecutar após corrigir a causa, preservando as cópias existentes |
+
+O destino é um padrão de montagem, **não um serviço de armazenamento já contratado ou provisionado**. A escolha não cria custos, conta, bucket ou servidor. Os arquivos `scripts/systemd/baixas-backup.service` e `scripts/systemd/baixas-backup.timer` preparam o agendamento em servidor Linux com systemd; não rodam no site estático do Render. Enquanto o destino externo e as credenciais não forem configurados, a rotina não está ativa.
+
+### Ativação pelo operador
+
+Preparar o servidor externo com usuário de serviço `baixas-backup`, cópia do projeto em `/opt/baixadeestoque`, Python 3, GPG e cliente PostgreSQL compatível. Montar o armazenamento privado em `/mnt/baixas-backups` e conceder escrita apenas ao usuário de serviço. Configurar os dez anos de guarda/versionamento no destino. O serviço verifica se essa pasta é realmente um ponto de montagem antes de gerar a cópia, evitando gravar no disco local por engano.
+
+Configurar `/etc/baixas-backup/env` com as variáveis descritas anteriormente, por canal administrativo seguro, e preparar os arquivos libpq e a chave pública GPG acessíveis ao usuário de serviço. Não enviar senhas, chaves de serviço ou chave privada pelo chat nem gravá-las no repositório. Manter `BACKUP_DIR=/mnt/baixas-backups`; alterações desse caminho exigem ajustar também a verificação de montagem na unidade.
+
+Depois de preparar o ambiente, instalar as unidades:
+
+```sh
+sudo install -m 0644 scripts/systemd/baixas-backup.service /etc/systemd/system/
+sudo install -m 0644 scripts/systemd/baixas-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+# Primeiro gerar uma cópia real e conferir o inventário:
+sudo systemctl start baixas-backup.service
+sudo journalctl -u baixas-backup.service --no-pager -n 30
+# Após conferir o backup e concluir o primeiro teste de restauração:
+sudo systemctl enable --now baixas-backup.timer
+sudo systemctl list-timers baixas-backup.timer
+```
+
+O timer não sobrepõe execuções da mesma unidade e executa uma rotina pendente após reinício do servidor. Se esse disparo ocorrer fora das 02h, o operador deve assegurar uma janela sem alterações de anexos, pois o snapshot do banco e a leitura do Storage não são atômicos. A ativação, o primeiro backup, o monitoramento e a restauração real ainda precisam ser comprovados; a publicação destes arquivos não os executa.
