@@ -111,6 +111,9 @@ export function TerminalPage() {
           />
         )}
       </main>
+      <footer className="px-4 pb-4 text-center text-sm">
+        <a href="/aviso-de-privacidade.html" target="_blank" rel="noopener noreferrer" className="font-medium text-brand-700 underline">Aviso de privacidade <span className="sr-only">(abre em nova aba)</span></a>
+      </footer>
     </div>
   );
 }

@@ -111,3 +111,10 @@ Decisão do responsável: **10 anos desde a data de criação** para cadastros f
 Implementados arquivo facial isolado do reconhecimento com criação original, piso de dez anos civis para descarte de logs (sem reduzir a guarda de logs vinculados a MEs), bloqueio de exclusão antecipada de tentativas faciais e de saídas offline pendentes pela interface, resumo administrativo com MFA e inventário de backups efetivamente gerados. Cópias temporárias de acesso continuam com validade própria; após sincronização, a evidência offline passa à ME.
 
 A regra depende de aplicar `supabase/sql/29_retencao_adicional.sql` em produção. O script `scripts/backup-retention.py` e o procedimento de restauração estão preparados, mas destino externo, credenciais, agendamento e teste real de recuperação dependem do operador. Não foi configurada retenção nos provedores nem executado backup de produção. Detalhes e limitações: [RETENCAO_ADICIONAL.md](RETENCAO_ADICIONAL.md). As pendências históricas de implementação acima devem ser lidas à luz desta seção.
+
+
+## Aviso de privacidade aos funcionários (22/11/2026)
+
+Preparado em `public/aviso-de-privacidade.html`, com acesso público independente de autenticação ou consultas ao banco. Links na entrada/recuperação de acesso, menu e tablet do balcão. Versão 1.0 com controlador e contatos informados, dados/finalidades, biometria e alternativa manual, prestadores, política de guarda, direitos e canal de atendimento. A página pode ser impressa/salva em PDF pelo navegador. Não coleta aceite nem presume consentimento.
+
+O texto não atribui uma hipótese legal específica à biometria sem documentação dessa decisão: direciona a consulta ao documento do DP e ao encarregado. Publicar o aviso demonstra disponibilidade, não comprova leitura individual, distribuição pelo DP, designação formal do encarregado, base legal validada ou adequação completa. A política de backups apresentada não afirma que as cópias já estão ativas. Informações do controlador/contato são públicas conforme autorização anterior; mudanças exigem nova versão do aviso.
