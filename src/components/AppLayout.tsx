@@ -116,6 +116,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <NavSection title="Cadastros" items={REGISTRY} onNavigate={onNavigate} />
         <NavSection title="Administração" items={ADMIN} onNavigate={onNavigate} />
       </nav>
+      <a href="/aviso-de-privacidade.html" target="_blank" rel="noopener noreferrer" className="mt-3 rounded-lg border-t border-white/20 px-3 py-3 text-sm text-brand-100 hover:bg-white/10 hover:text-white">
+        Aviso de privacidade <span className="sr-only">(abre em nova aba)</span>
+      </a>
     </div>
   );
 }

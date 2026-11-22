@@ -19,6 +19,9 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
           <h1 className="text-xl font-bold text-slate-900">{title}</h1>
           {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
           <div className="mt-6">{children}</div>
+          <p className="mt-5 border-t border-slate-100 pt-4 text-center text-sm">
+            <a href="/aviso-de-privacidade.html" target="_blank" rel="noopener noreferrer" className="font-medium text-brand-700 hover:underline">Aviso de privacidade <span className="sr-only">(abre em nova aba)</span></a>
+          </p>
         </div>
       </div>
     </div>
