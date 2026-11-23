@@ -92,3 +92,14 @@ sudo systemctl list-timers baixas-backup.timer
 ```
 
 O timer não sobrepõe execuções da mesma unidade e executa uma rotina pendente após reinício do servidor. Se esse disparo ocorrer fora das 02h, o operador deve assegurar uma janela sem alterações de anexos, pois o snapshot do banco e a leitura do Storage não são atômicos. A ativação, o primeiro backup, o monitoramento e a restauração real ainda precisam ser comprovados; a publicação destes arquivos não os executa.
+
+
+## Correção do carregamento do resumo — migração 30 (23/11/2026)
+
+Se a seção de guarda adicional falhar enquanto outras partes de Segurança carregam, não concluir que a internet caiu. A mensagem antiga classificava também o timeout do PostgreSQL (`57014`) como falha de conexão.
+
+Reprodução local com 50 mil tentativas faciais simuladas: a consulta anterior levou aproximadamente 4,3 segundos e foi cancelada quando o limite foi fixado em 3 segundos. Após ler o fuso uma vez e calcular cada prazo uma única vez, a mesma consulta retornou as mesmas contagens e datas em cerca de 54 ms no ambiente de teste. Esses tempos são evidência local, não garantia de tempo em produção. A causa específica do erro mostrado pelo usuário ainda depende de confirmação em produção.
+
+**Aplicar somente** `supabase/sql/30_otimiza_resumo_retencao.sql` depois da migração 29, no SQL Editor do Supabase. Não reaplicar o instalador completo. A alteração substitui apenas a função de resumo: não modifica registros, prazos, autorização administrativa com MFA ou o limite de tempo do servidor. O arquivo `07m` entra em instalações novas.
+
+Depois da publicação do front-end e da aplicação do SQL, atualizar Segurança com Ctrl+F5. O botão **Tentar novamente** repete a consulta. Uma nova verificação administrativa também atualiza essa seção. Se houver timeout, a tela agora informa o limite de tempo e o código `57014`, sem instruir o usuário a verificar a internet. Somente marcar o carregamento como aprovado após observar a seção funcionando no ambiente real.

@@ -25,7 +25,10 @@ const NETWORK_PATTERNS = [/failed to fetch/i, /networkerror/i, /network request 
 
 export function isNetworkError(err: unknown): boolean {
   if (err instanceof AppError) return err.isNetwork;
-  const msg = (err as ErrorLike)?.message ?? String(err ?? '');
+  const e = (err ?? {}) as ErrorLike;
+  const msg = e.message ?? String(err ?? '');
+  // O PostgreSQL respondeu: cancelar a consulta não é falta de internet.
+  if (e.code === '57014' || /canceling statement due to statement timeout/i.test(msg)) return false;
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
   return NETWORK_PATTERNS.some((re) => re.test(msg));
 }
@@ -34,6 +37,10 @@ export function toAppError(err: unknown, fallback = 'Não foi possível concluir
   if (err instanceof AppError) return err;
   const e = (err ?? {}) as ErrorLike;
   const msg = e.message ?? (typeof err === 'string' ? err : '');
+
+  if (e.code === '57014' || /canceling statement due to statement timeout/i.test(msg)) {
+    return new AppError('O servidor atingiu o limite de tempo desta consulta. Tente novamente; se persistir, informe ao administrador o código 57014.', { code: '57014' });
+  }
 
   if (isNetworkError(err)) {
     return new AppError('Sem conexão com o servidor. Verifique a internet e tente novamente — os dados preenchidos foram mantidos.', {
