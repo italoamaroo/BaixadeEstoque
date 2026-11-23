@@ -48,3 +48,10 @@ Para corrigir a configuração no serviço existente, conferir os valores já de
 | Incidente | Registro, classificação, avaliação, prazos e encerramento validados em cenário claramente identificado como simulação; não comunicar ANPD ou titulares automaticamente. |
 
 Não foram alterados perfis, senhas, permissões, configurações ou registros de negócio. O acesso autenticado precisa ser retomado pelo mecanismo seguro, sem fornecer senhas ou códigos no chat. Testes de escrita exigem cuidado com a identificação da simulação, pois a trilha de auditoria e os pedidos de titulares são preservados.
+
+
+## Nova conferência em 23/11/2026
+
+Requisições HTTPS sem autenticação, com `Cache-Control: no-cache`, para `/`, `/login` e `/aviso-de-privacidade.html` responderam HTTP 200. Em todas as três respostas, `X-Frame-Options`, `Content-Security-Policy-Report-Only` e uma eventual CSP bloqueante não estavam presentes. HSTS estava presente. Nenhuma configuração do Render foi alterada por esta conferência.
+
+Os valores pretendidos continuam definidos em `render.yaml`. É necessário conferir os cabeçalhos do serviço existente no painel do Render ou sincronizar seu Blueprint, se o serviço for gerenciado por ele. Para a correção mínima, aplicar ao caminho `/*`: `X-Frame-Options` com valor `DENY` e `Content-Security-Policy-Report-Only` com a política completa definida no YAML. Não trocar report-only por uma CSP bloqueante sem validar os fluxos de câmera, autenticação e exportação. Depois de salvar a configuração, repetir a leitura dos cabeçalhos HTTP; publicar código sozinho não comprova aplicação desses valores.
