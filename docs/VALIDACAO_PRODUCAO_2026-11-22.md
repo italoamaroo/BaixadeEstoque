@@ -86,3 +86,10 @@ No procedimento guiado, o responsável apresentou a listagem de uma conta restri
 ## Conta restrita bloqueada na administração de usuários — 23/11/2026
 
 A captura apresentada pelo responsável mostra a URL `/admin/usuarios`, a indicação do estoque Dois Irmãos e a mensagem `Acesso não permitido — Seu perfil não tem permissão para acessar esta tela`, sem a listagem de usuários. **Aprovado o cenário de navegação direta para a tela administrativa com a conta restrita utilizada no procedimento.** Não foram concedidas permissões nem alterados usuários. Esta evidência de interface não equivale a teste direto autenticado das RPCs administrativas ou a aprovação de todos os perfis. Seguem pendentes os fluxos de pedidos de titulares e incidentes e os demais cenários de API/roles não demonstrados.
+
+
+## Pedido de titular simulado: registro, prazo e bloqueio por identidade — 23/11/2026
+
+O responsável registrou, em sua conta administrativa, um pedido explicitamente identificado como `TESTE TECNICO - SEM TITULAR REAL`, sem vínculo com funcionário real e com canal `TESTE INTERNO - SEM ENVIO`. A captura mostra protocolo `SOL-2026-001`, situação Recebido, recebimento em 23/11/2026 às 15:09 e vencimento em 08/12/2026, coerente com os 15 dias corridos configurados. A descrição identifica a simulação e a ausência de comunicação externa. **Aprovados, nesse cenário, criação de protocolo e cálculo do prazo configurado.**
+
+Sem marcar identidade conferida, o responsável abriu Registrar resposta, escolheu Atendido, escreveu resumo de simulação e tentou registrar. A imagem seguinte mostra a recusa: `Confira e registre a identidade de quem pediu antes de responder`, com o formulário ainda aberto. **Aprovado o bloqueio de gravação da resposta sem conferência de identidade nesse fluxo.** Não confundir o resultado com comprovação de identidade de pessoa real. A resposta positiva, o encerramento e sua preservação no histórico ainda precisam ser demonstrados. O registro de teste permanece identificado na base; nenhum envio externo foi solicitado.
