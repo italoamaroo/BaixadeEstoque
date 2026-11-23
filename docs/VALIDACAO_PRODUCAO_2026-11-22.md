@@ -67,3 +67,10 @@ Após o responsável informar que salvou as regras no painel do Render, novas re
 O responsável executou **Rodar verificações agora** em seu próprio navegador. A imagem final mostra: `Verificações concluídas: integridade ok, 0 alerta(s), 0 evento(s) do Supabase Auth importados`, último horário exibido 23/11/2026 às 14:48 e pg_cron ativo, com verificação de hora em hora. A operação administrativa e seu retorno de sucesso foram observados por essa evidência; não houve sessão compartilhada com o assistente. A imagem não demonstra isoladamente a etapa de desafio MFA, nem o isolamento entre perfis/estoques. Zero eventos importados não comprova cobertura de todos os eventos do provedor.
 
 **Pendência encontrada:** a seção `Guarda de cadastros faciais, logs e dados offline` continua com erro de consulta, embora a verificação administrativa tenha terminado com sucesso. Não marcar essa seção como aprovada. A mensagem genérica de rede do front-end também pode ser usada para timeouts; a imagem não identifica a causa técnica. Próxima verificação: recarregar a página para repetir a consulta; se persistir, obter o erro específico da RPC sem expor cabeçalhos de autenticação ou dados de titulares. Perfis/estoques, pedidos e incidentes continuam pendentes.
+
+
+## Resumo de guarda adicional funcionando após SQL 30 — 23/11/2026
+
+O responsável apresentou sucesso da execução da migração 30 no SQL Editor e, depois, captura de Segurança com a seção de guarda adicional carregada, exibindo categorias, contagens e próximos prazos, sem a mensagem de falha. A regra de dez anos desde a criação e a ausência de exclusão automática aparecem na tela. **O teste de carregamento dessa seção está aprovado pela evidência apresentada.** Os totais de produção não foram copiados para este relatório.
+
+A imagem mostra zero backups registrados no inventário da aplicação; isso não demonstra presença ou ausência de backups nativos do provedor e não substitui ativação e restauração de cópia externa. A conclusão do carregamento não aprova isolamento entre perfis/estoques nem fluxos de pedidos de titulares e incidentes, que seguem para testes específicos.
