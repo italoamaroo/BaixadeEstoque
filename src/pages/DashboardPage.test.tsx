@@ -54,7 +54,7 @@ describe('painel operacional', () => {
     await render();
     expect(container.textContent).toContain('Não foi possível consultar as pendências');
     expect(container.textContent).not.toContain('Nenhuma pendência encontrada');
-    expect(container.textContent).toContain('Concluídas no período');
+    expect(container.textContent).toContain('Concluídas');
   });
   it('oferece a ME pendente e sua próxima ação', async () => {
     mocks.search.mockResolvedValue({ total: 1, rows: [{ id: 'me1', me_number: 'ME-001', status: 'sa_informada', movement_at: new Date().toISOString(), requester_name: 'Carlos', warehouse_name: 'Dois Irmãos' }] });

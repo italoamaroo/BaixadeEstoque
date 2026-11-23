@@ -2,7 +2,6 @@ import { useRef, useCallback, useEffect, useMemo, useState, type ReactNode } fro
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Bar,
-  Cell,
   BarChart,
   CartesianGrid,
   Legend,
@@ -11,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { AlertTriangle, CalendarDays, CheckCheck, ClipboardList, Hourglass, PackageMinus, RefreshCw } from 'lucide-react';
+import { PackageMinus, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { FiltersPanel } from '@/components/FiltersPanel';
@@ -28,7 +27,7 @@ import { useHeaderWarehouseFilter } from '@/hooks/useHeaderWarehouseFilter';
 import { STATUS_LABELS } from '@/lib/constants';
 import type { DashboardData, MovementRow, MovementStatus } from '@/types/db';
 
-const WH_COLORS = ['#1d43c4', '#0d9488', '#f97316', '#7c3aed', '#64748b'];
+const WH_COLORS = ['#142b60', '#60a5ed', '#2563eb', '#7c3aed', '#64748b'];
 const AGING_COLORS: Record<string, string> = {
   'Até 1 dia': '#fbbf24',
   '2 a 3 dias': '#f97316',
@@ -36,29 +35,12 @@ const AGING_COLORS: Record<string, string> = {
   'Mais de 7 dias': '#dc2626',
 };
 
-function StatCard({ label, value, unit, icon, tone = 'slate', hint, to }: { label: string; value: string; unit: string; icon: ReactNode; tone?: string; hint?: ReactNode; to?: string }) {
-  const tones: Record<string, string> = {
-    slate: 'bg-slate-100 text-slate-700',
-    blue: 'bg-brand-50 text-brand-700',
-    teal: 'bg-teal-50 text-teal-700',
-    orange: 'bg-orange-50 text-orange-700',
-    green: 'bg-emerald-50 text-emerald-700',
-    red: 'bg-red-50 text-red-700',
-    amber: 'bg-amber-50 text-amber-700',
-  };
-  const body = (
-    <div className="flex h-full items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-card transition-colors hover:border-brand-200">
-      <span className={clsx('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg', tones[tone])}>{icon}</span>
-      <div className="min-w-0">
-        <p className="text-xs font-medium text-slate-500">{label}</p>
-        <p className="mt-1 text-3xl font-bold tabular-nums text-slate-900">{value}</p>
-        <p className="text-[11px] text-slate-400">{unit}</p>
-        {hint && <div className="mt-1 text-[11px] text-slate-500">{hint}</div>}
-      </div>
-    </div>
-  );
-  if (to?.startsWith('#')) return <a href={to}>{body}</a>;
-  return to ? <Link to={to}>{body}</Link> : body;
+function StatCard({ label, value, unit, to }: { label: string; value: string; unit: string; to: string }) {
+  return <Link to={to} className="block h-full rounded-xl border border-slate-300 bg-white p-5 shadow-card transition-colors hover:border-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600">
+    <p className="text-base font-medium text-slate-900 sm:text-lg">{label}</p>
+    <p className="mt-2 text-5xl font-bold tabular-nums tracking-tight text-slate-950">{value}</p>
+    <p className="mt-2 text-xs text-slate-500">{unit}</p>
+  </Link>;
 }
 
 function ChartCard({ title, subtitle, children, height = 260 }: { title: string; subtitle: string; children: ReactNode; height?: number }) {
@@ -203,18 +185,17 @@ export function DashboardPage() {
   if (loading && !data) return <PageLoader label="Carregando painel…" />;
 
   const c = data?.cards;
-  const overdue = (data?.pending_aging ?? []).filter((v) => v.bucket === 'Mais de 7 dias').reduce((sum, v) => sum + Number(v.mes), 0);
   const applyPeriod = (from: string, to: string) => setParams(filtersToSearchParams({ ...filters, date_from: from, date_to: to }), { replace: true });
   const nextAction = (m: MovementRow) => m.status === 'aguardando_assinatura' ? 'Confirmar retirada'
     : m.status === 'aguardando_aprovacao' ? 'Aprovar ME'
     : m.status === 'aguardando_sa' ? 'Informar SA' : 'Confirmar baixa no ERP';
   const statuses = c ? [
-    { label: 'Aguardando confirmação', value: confirmationCount ?? 0, color: '#c58b36' },
-    { label: 'Aguardando aprovação', value: c.aguardando_aprovacao, color: '#b7791f' },
-    { label: 'Pendente SA / ERP', value: c.aguardando_sa + c.sa_informada, color: '#93b4fd' },
-    { label: 'Concluídas', value: c.concluida, color: '#1d43c4' },
-    { label: 'Canceladas', value: c.cancelada, color: '#94a3b8' },
-    { label: 'Em preparação / outras', value: Math.max(0, c.total_mes - (confirmationCount ?? 0) - c.aguardando_aprovacao - c.aguardando_sa - c.sa_informada - c.concluida - c.cancelada), color: '#64748b' },
+    { label: 'Concluídas', value: c.concluida, color: '#142b60' },
+    { label: 'Canceladas', value: c.cancelada, color: '#2354cb' },
+    { label: 'Pendente SA / ERP', value: c.aguardando_sa + c.sa_informada, color: '#3983dc' },
+    { label: 'Aguardando confirmação', value: confirmationCount ?? 0, color: '#579ce6' },
+    { label: 'Aguardando aprovação', value: c.aguardando_aprovacao, color: '#7ab6ef' },
+    { label: 'Em preparação / outras', value: Math.max(0, c.total_mes - (confirmationCount ?? 0) - c.aguardando_aprovacao - c.aguardando_sa - c.sa_informada - c.concluida - c.cancelada), color: '#a1cdf5' },
   ].filter((v) => v.value > 0) : [];
   return (
     <div className="space-y-5">
@@ -263,14 +244,71 @@ export function DashboardPage() {
 
       {c && data && (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <StatCard label="MEs no período" value={fmtInt(c.total_mes)} unit={`${fmtInt(c.today_mes)} hoje no recorte selecionado`} icon={<ClipboardList className="h-5 w-5" />} tone="blue" to={withFilters({})} />
-            <StatCard label="Aguardando confirmação" value={confirmationCount === null ? '—' : fmtInt(confirmationCount)} unit="retiradas a confirmar" icon={<CalendarDays className="h-5 w-5" />} tone="orange" to={withFilters({ status: ['aguardando_assinatura'] })} />
-            <StatCard label="Pendentes SA / ERP" value={fmtInt(c.aguardando_sa + c.sa_informada)} unit={`${fmtInt(c.aguardando_sa)} SA · ${fmtInt(c.sa_informada)} baixa ERP`} icon={<Hourglass className="h-5 w-5" />} tone="orange" to={withFilters({ status: ['aguardando_sa', 'sa_informada'] })} />
-            <StatCard label="SA há mais de 7 dias" value={fmtInt(overdue)} unit="MEs aguardando SA no recorte" icon={<AlertTriangle className="h-5 w-5" />} tone={overdue ? 'red' : 'green'} to="#pendencias-prioritarias" />
-            <StatCard label="Concluídas no período" value={fmtInt(c.concluida)} unit="MEs finalizadas" icon={<CheckCheck className="h-5 w-5" />} tone="green" to={withFilters({ status: ['concluida'] })} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard label="Total de MEs" value={fmtInt(c.total_mes)} unit="No período e filtros selecionados" to={withFilters({})} />
+            <StatCard label="Concluídas" value={fmtInt(c.concluida)} unit="MEs finalizadas no período" to={withFilters({ status: ['concluida'] })} />
+            <StatCard label="Canceladas" value={fmtInt(c.cancelada)} unit="MEs canceladas no período" to={withFilters({ status: ['cancelada'] })} />
+            <StatCard label="Pendentes SA / ERP" value={fmtInt(c.aguardando_sa + c.sa_informada)} unit={`${fmtInt(c.aguardando_sa)} aguardando SA · ${fmtInt(c.sa_informada)} baixa ERP`} to={withFilters({ status: ['aguardando_sa', 'sa_informada'] })} />
           </div>
-          <p className="text-xs text-slate-500">Todos os indicadores respeitam os filtros acima. Clique nos cartões para consultar as MEs.</p>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="border-slate-300">
+              <CardHeader title="Situação das MEs" subtitle="Distribuição no período e nos filtros selecionados." />
+              {confirmationCount === null ? <p className="py-10 text-sm text-slate-500">Distribuição indisponível enquanto a confirmação não for consultada.</p> : c.total_mes === 0 ? <p className="py-10 text-sm text-slate-500">Sem movimentações no período.</p> : <>
+                <div className="mt-6 flex h-14 overflow-hidden rounded-lg" role="img" aria-label={statuses.map((v) => `${v.label}: ${fmtInt(v.value)}`).join('; ')}>
+                  {statuses.map((v) => <div key={v.label} style={{ flex: v.value, backgroundColor: v.color }} className="flex min-w-0 items-center justify-center overflow-hidden text-sm font-semibold text-white" title={`${v.label}: ${fmtInt(v.value)}`}><span>{fmtInt(v.value)}</span></div>)}
+                </div>
+                <ul className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm">{statuses.map((v) => <li key={v.label} className="flex items-center gap-2"><span className="h-4 w-4 shrink-0 rounded" style={{ backgroundColor: v.color }} /><span>{v.label} <strong className="tabular-nums">{fmtInt(v.value)}</strong></span></li>)}</ul>
+              </>}
+            </Card>
+            <Card className="border-slate-300">
+              <CardHeader title="Materiais mais retirados" subtitle="Frequência em linhas de retirada; não soma unidades diferentes." />
+              {data.top_materials_lines.length === 0 ? <p className="py-10 text-sm text-slate-500">Sem materiais no período.</p> : <ul className="space-y-3">{data.top_materials_lines.slice(0, 5).map((r, i) => <li key={`${r.material}-${i}`} className="grid grid-cols-[minmax(0,1fr)_minmax(50px,1fr)_2rem] items-center gap-3 text-sm">
+                <span className="truncate" title={r.material}>{r.material}</span>
+                <span className="h-2 overflow-hidden rounded-full bg-slate-100"><span className="block h-full rounded-full bg-blue-700" style={{ width: `${Math.max(0, Number(r.lines)) / Math.max(1, ...data.top_materials_lines.slice(0, 5).map((m) => Number(m.lines))) * 100}%` }} /></span>
+                <strong className="text-right tabular-nums">{fmtInt(r.lines)}</strong>
+              </li>)}</ul>}
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader
+              title="Evolução das saídas"
+              subtitle="Quantidade de MEs por período, comparando os estoques."
+              actions={
+                <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-semibold">
+                  {(
+                    [
+                      ['daily', 'Diária'],
+                      ['weekly', 'Semanal'],
+                      ['monthly', 'Mensal'],
+                    ] as const
+                  ).map(([k, l]) => (
+                    <button key={k} type="button" onClick={() => setPeriod(k)} className={clsx('rounded-md px-3 py-1.5', period === k ? 'bg-slate-800 text-white shadow' : 'text-slate-600')}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              }
+            />
+            <div style={{ height: 280 }}>
+              {series.length === 0 ? (
+                <p className="py-16 text-center text-sm text-slate-500">Sem movimentações no período.</p>
+              ) : (
+                <ResponsiveContainer>
+                  <BarChart data={series} margin={{ left: -20, right: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="periodo" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(v) => [`${v} MEs`]} />
+                    <Legend verticalAlign="top" />
+                    {whNames.map((w, i) => (
+                      <Bar isAnimationActive={false} key={w} dataKey={w} name={w} fill={WH_COLORS[i % WH_COLORS.length]} radius={[3, 3, 0, 0]} />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </Card>
 
           <section id="pendencias-prioritarias" className="scroll-mt-20">
             <Card>
@@ -291,69 +329,6 @@ export function DashboardPage() {
               )}
             </Card>
           </section>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <ChartCard title="Situação das MEs" subtitle="Quantidade de MEs por etapa, no período e nos filtros selecionados.">
-              {confirmationCount === null ? <p className="py-16 text-center text-sm text-slate-500">Distribuição indisponível enquanto a confirmação não for consultada.</p> : c.total_mes === 0 ? <p className="py-16 text-center text-sm text-slate-500">Sem movimentações no período.</p> : <ResponsiveContainer>
-                <BarChart data={statuses} layout="vertical" margin={{ left: 0, right: 24 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <YAxis type="category" dataKey="label" width={145} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v) => [`${v} MEs`, 'Quantidade']} />
-                  <Bar dataKey="value" isAnimationActive={false} radius={[0, 4, 4, 0]}>{statuses.map((v) => <Cell key={v.label} fill={v.color} />)}</Bar>
-                </BarChart>
-              </ResponsiveContainer>}
-            </ChartCard>
-            <ChartCard title="Materiais mais retirados" subtitle="Número de linhas de retirada por material; não soma unidades diferentes.">
-              {data.top_materials_lines.length === 0 ? <p className="py-16 text-center text-sm text-slate-500">Sem materiais no período.</p> : <ResponsiveContainer>
-                <BarChart data={data.top_materials_lines.slice(0, 5).map((r) => ({ ...r, nome: short(r.material) }))} layout="vertical" margin={{ left: 0, right: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} /><YAxis type="category" dataKey="nome" width={140} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v) => [`${v} linhas de retirada`, 'Frequência']} labelFormatter={(_, p) => p?.[0]?.payload?.material ?? ''} />
-                  <Bar isAnimationActive={false} dataKey="lines" fill="#1d43c4" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>}
-            </ChartCard>
-          </div>
-
-          <Card>
-            <CardHeader
-              title="Evolução das saídas"
-              subtitle="Quantidade de MEs por período, comparando os estoques."
-              actions={
-                <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-semibold">
-                  {(
-                    [
-                      ['daily', 'Diária'],
-                      ['weekly', 'Semanal'],
-                      ['monthly', 'Mensal'],
-                    ] as const
-                  ).map(([k, l]) => (
-                    <button key={k} type="button" onClick={() => setPeriod(k)} className={clsx('rounded-md px-3 py-1.5', period === k ? 'bg-white text-brand-800 shadow' : 'text-slate-600')}>
-                      {l}
-                    </button>
-                  ))}
-                </div>
-              }
-            />
-            <div style={{ height: 280 }}>
-              {series.length === 0 ? (
-                <p className="py-16 text-center text-sm text-slate-500">Sem movimentações no período.</p>
-              ) : (
-                <ResponsiveContainer>
-                  <BarChart data={series} margin={{ left: -20, right: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="periodo" tick={{ fontSize: 11 }} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                    <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(v) => [`${v} MEs`]} />
-                    <Legend />
-                    {whNames.map((w, i) => (
-                      <Bar isAnimationActive={false} key={w} dataKey={w} name={w} fill={WH_COLORS[i % WH_COLORS.length]} radius={[3, 3, 0, 0]} />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </Card>
 
           <details className="rounded-xl border border-slate-200 bg-white p-4">
             <summary className="cursor-pointer font-semibold text-brand-800">Análises detalhadas por estoque, material, setor e usuário</summary>
