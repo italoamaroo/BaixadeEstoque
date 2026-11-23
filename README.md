@@ -30,6 +30,10 @@ Cadastros faciais, logs e fila offline pendente: 10 anos desde criação.
 Backups exigem geração e armazenamento externo configurado; a migração não ativa
 backup nem altera o provedor. Instruções: [`docs/RETENCAO_ADICIONAL.md`](docs/RETENCAO_ADICIONAL.md).
 
+Para corrigir lentidão no resumo de guarda adicional, aplicar
+`supabase/sql/30_otimiza_resumo_retencao.sql` após a 29. Detalhes e verificação:
+[`docs/RETENCAO_ADICIONAL.md`](docs/RETENCAO_ADICIONAL.md).
+
 ## 1. Visão geral
 
 | Perfil | O que faz |

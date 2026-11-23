@@ -3,7 +3,7 @@ import { parseQty, slugify } from './format';
 import { saNumberError, materialSchema, firstError } from './validation';
 import { parseCsv, matrixToRows, labelMatrixToRows } from './import';
 import { mapExportRows } from './excel';
-import { toAppError } from './errors';
+import { isNetworkError, toAppError } from './errors';
 import { buildSignaturePath } from './signature';
 import { can } from './constants';
 
@@ -54,6 +54,17 @@ describe('excel', () => {
 });
 
 describe('erros', () => {
+  it('distingue timeout do PostgreSQL de perda de conexão e preserva o código', () => {
+    const db = { code:'57014', message:'canceling statement due to statement timeout' };
+    expect(isNetworkError(db)).toBe(false);
+    const error = toAppError(db);
+    expect(error.code).toBe('57014');
+    expect(error.isNetwork).toBe(false);
+    expect(error.message).toContain('limite de tempo');
+    expect(error.message).not.toContain('Verifique a internet');
+    expect(isNetworkError(new TypeError('Failed to fetch'))).toBe(true);
+  });
+
   it('traduz falha de rede e permissão', () => {
     expect(toAppError(new TypeError('Failed to fetch')).isNetwork).toBe(true);
     expect(toAppError({ message: 'new row violates row-level security policy', code: '42501' }).message).toMatch(/permissão/);

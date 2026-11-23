@@ -1,6 +1,6 @@
 -- =====================================================================
 -- INSTALAÇÃO COMPLETA (gerado por scripts/montar-sql.mjs — não edite à mão)
--- Arquivos: 01_extensoes_e_tipos.sql, 02_tabelas.sql, 03_funcoes_e_triggers.sql, 04_rpc_movimentacoes.sql, 05_rpc_administracao.sql, 06_rls_e_permissoes.sql, 07_storage.sql, 07b_balcao.sql, 07c_retirada_repetida.sql, 07d_me_emergencial.sql, 07e_auditoria_base.sql, 07f_seguranca_alertas_retencao.sql, 07g_incidentes_lgpd.sql, 07h_pedidos_titulares.sql, 07i_reconhecimento_facial.sql, 07j_endurecimento_lgpd.sql, 07k_retencao_mes.sql, 07l_retencao_adicional.sql, 08_dados_iniciais.sql
+-- Arquivos: 01_extensoes_e_tipos.sql, 02_tabelas.sql, 03_funcoes_e_triggers.sql, 04_rpc_movimentacoes.sql, 05_rpc_administracao.sql, 06_rls_e_permissoes.sql, 07_storage.sql, 07b_balcao.sql, 07c_retirada_repetida.sql, 07d_me_emergencial.sql, 07e_auditoria_base.sql, 07f_seguranca_alertas_retencao.sql, 07g_incidentes_lgpd.sql, 07h_pedidos_titulares.sql, 07i_reconhecimento_facial.sql, 07j_endurecimento_lgpd.sql, 07k_retencao_mes.sql, 07l_retencao_adicional.sql, 07m_otimiza_resumo_retencao.sql, 08_dados_iniciais.sql
 -- Dados fictícios NÃO incluídos: execute 09_dados_ficticios.sql à parte.
 -- =====================================================================
 set client_min_messages = warning;
@@ -10099,6 +10099,47 @@ revoke all on function public.additional_retention_summary() from public, anon;
 grant execute on function public.additional_retention_summary() to authenticated;
 comment on table public.employee_faces_archive is 'Histórico de modelos removidos: 10 anos desde criação original; isolado do reconhecimento e sem leitura pela aplicação.';
 comment on table public.retention_backups is 'Inventário de backups: 10 anos desde criação de cada cópia. Arquivos externos e sua durabilidade precisam de configuração operacional.';
+commit;
+
+
+-- >>>>>>>>>> 07m_otimiza_resumo_retencao.sql
+-- 30: otimiza somente a consulta do resumo de guarda adicional.
+-- Aplicar após 29. Não altera prazos, registros, permissões ou configurações de timeout.
+begin;
+create or replace function public.additional_retention_summary()
+returns jsonb language plpgsql stable security definer set search_path=public,pg_temp as $$
+declare
+  v jsonb;
+  v_tz text;
+begin
+  if not public.is_admin() then
+    raise exception 'Somente administrador com MFA.' using errcode='42501';
+  end if;
+  -- Ler a configuração uma vez, não várias vezes para cada evento do histórico.
+  v_tz := coalesce((public.get_settings()).timezone,'America/Recife');
+  with records as (
+    select 'cadastros_faciais' category, created_at from public.employee_faces
+    union all select 'cadastros_faciais',created_at from public.employee_faces_archive
+    union all select 'logs',occurred_at from public.audit_logs where purged_at is null and movement_id is null
+    union all select 'tentativas_faciais',created_at from public.face_attempts
+    union all select 'falhas_login_legadas',window_start from public.auth_login_failures
+    union all select 'backups',created_at from public.retention_backups
+  ), deadlines as materialized (
+    -- Anos civis e fuso original: não substituir por 3650 dias.
+    select category,((created_at at time zone v_tz)+interval '10 years') at time zone v_tz as retain_until
+    from records
+  ), totals as (
+    select category,count(*) total,
+      count(*) filter(where retain_until<=now()) review_due,
+      min(retain_until) filter(where retain_until>now()) next_review_at
+    from deadlines group by category
+  ) select coalesce(jsonb_object_agg(category,jsonb_build_object('total',total,'review_due',review_due,'next_review_at',next_review_at)),'{}') into v from totals;
+  return jsonb_build_object('years',10,'basis_event','criacao','automatic_deletion',false,
+    'categories',v,'backup_provider_configured',false,
+    'offline_scope','Fila não sincronizada no aparelho; após envio, guarda junto da ME. Cache de acesso não é arquivo.');
+end; $$;
+revoke all on function public.additional_retention_summary() from public, anon;
+grant execute on function public.additional_retention_summary() to authenticated;
 commit;
 
 

@@ -150,7 +150,7 @@ function SecurityContent() {
       </Card>
 
       <MovementRetentionCard />
-      {admin && <AdditionalRetentionCard />}
+      {admin && <AdditionalRetentionCard refreshKey={data.last_checks?.at ?? ''} />}
 
       {tabs.length > 1 && (
         <div role="tablist" className="flex flex-wrap gap-1 border-b border-slate-200">
