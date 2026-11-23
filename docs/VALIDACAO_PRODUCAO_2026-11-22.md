@@ -74,3 +74,10 @@ O responsável executou **Rodar verificações agora** em seu próprio navegador
 O responsável apresentou sucesso da execução da migração 30 no SQL Editor e, depois, captura de Segurança com a seção de guarda adicional carregada, exibindo categorias, contagens e próximos prazos, sem a mensagem de falha. A regra de dez anos desde a criação e a ausência de exclusão automática aparecem na tela. **O teste de carregamento dessa seção está aprovado pela evidência apresentada.** Os totais de produção não foram copiados para este relatório.
 
 A imagem mostra zero backups registrados no inventário da aplicação; isso não demonstra presença ou ausência de backups nativos do provedor e não substitui ativação e restauração de cópia externa. A conclusão do carregamento não aprova isolamento entre perfis/estoques nem fluxos de pedidos de titulares e incidentes, que seguem para testes específicos.
+
+
+## Acesso entre estoques acompanhado por imagens — 23/11/2026
+
+No procedimento guiado, o responsável apresentou a listagem de uma conta restrita com indicação de Dois Irmãos, sem seletor de troca, e somente movimentações desse estoque nas linhas visíveis. Em seguida, após orientação para abrir o endereço de uma ME de Muribeca previamente conferida pela conta administrativa, apresentou a mensagem `ME não encontrada — Ela não existe ou pertence a um estoque que você não tem permissão para consultar`, mantendo a indicação de Dois Irmãos e sem mostrar dados da ME.
+
+**Resultado do cenário guiado:** comportamento esperado de bloqueio na abertura do detalhe de ME de outro estoque, condicionado ao uso do endereço válido indicado no procedimento. A captura não mostra a URL/identificador da ME; portanto não constitui prova independente de sua existência ou de qual estoque ela pertence. Não foram recebidos tokens, alterações ou testes diretos autenticados da API. A conclusão é limitada à navegação demonstrada, não a uma certificação geral de todas as policies, operações de escrita ou perfis. O próximo cenário é o bloqueio da administração para a mesma conta restrita.
