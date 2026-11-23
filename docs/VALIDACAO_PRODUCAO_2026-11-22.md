@@ -60,3 +60,10 @@ Os valores pretendidos continuam definidos em `render.yaml`. É necessário conf
 ## Cabeçalhos confirmados após configuração pelo responsável — 23/11/2026
 
 Após o responsável informar que salvou as regras no painel do Render, novas requisições HTTPS com `Cache-Control: no-cache` a `/`, `/login` e `/aviso-de-privacidade.html` retornaram HTTP 200 com **`X-Frame-Options: DENY`** e **`Content-Security-Policy-Report-Only`**. A política recebida corresponde integralmente ao valor previsto em `render.yaml`. A pendência específica dos dois cabeçalhos está resolvida para as respostas examinadas. A CSP permanece em modo de observação (report-only), não em modo bloqueante. Esta confirmação não encerra os testes autenticados, a ativação de backups ou a avaliação de fornecedores.
+
+
+## Teste administrativo acompanhado por imagens — 23/11/2026
+
+O responsável executou **Rodar verificações agora** em seu próprio navegador. A imagem final mostra: `Verificações concluídas: integridade ok, 0 alerta(s), 0 evento(s) do Supabase Auth importados`, último horário exibido 23/11/2026 às 14:48 e pg_cron ativo, com verificação de hora em hora. A operação administrativa e seu retorno de sucesso foram observados por essa evidência; não houve sessão compartilhada com o assistente. A imagem não demonstra isoladamente a etapa de desafio MFA, nem o isolamento entre perfis/estoques. Zero eventos importados não comprova cobertura de todos os eventos do provedor.
+
+**Pendência encontrada:** a seção `Guarda de cadastros faciais, logs e dados offline` continua com erro de consulta, embora a verificação administrativa tenha terminado com sucesso. Não marcar essa seção como aprovada. A mensagem genérica de rede do front-end também pode ser usada para timeouts; a imagem não identifica a causa técnica. Próxima verificação: recarregar a página para repetir a consulta; se persistir, obter o erro específico da RPC sem expor cabeçalhos de autenticação ou dados de titulares. Perfis/estoques, pedidos e incidentes continuam pendentes.
