@@ -38,7 +38,7 @@ const AGING_COLORS: Record<string, string> = {
 function StatCard({ label, value, unit, to }: { label: string; value: string; unit: string; to: string }) {
   return <Link to={to} className="block h-full rounded-xl border border-slate-300 bg-white p-5 shadow-card transition-colors hover:border-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600">
     <p className="text-base font-medium text-slate-900 sm:text-lg">{label}</p>
-    <p className="mt-2 text-5xl font-bold tabular-nums tracking-tight text-slate-950">{value}</p>
+    <p className="mt-2 text-3xl font-bold tabular-nums tracking-tight text-slate-950">{value}</p>
     <p className="mt-2 text-xs text-slate-500">{unit}</p>
   </Link>;
 }
