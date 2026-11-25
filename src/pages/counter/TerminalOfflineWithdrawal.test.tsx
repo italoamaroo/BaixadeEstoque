@@ -39,6 +39,15 @@ describe('preparo da retirada offline no tablet', () => {
     expect(mocks.refresh).toHaveBeenCalledOnce();
     expect(container.textContent).toContain('Materiais da retirada');
   });
+  it('exige nova conferência quando chega outra versão autorizada', async () => {
+    mocks.load.mockResolvedValue(copy); await render(snap);
+    const checkbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    await act(async () => checkbox.click()); expect(checkbox.checked).toBe(true);
+    const next = { ...snap, session: { ...snap.session, version: 3 } };
+    mocks.load.mockResolvedValue({ ...copy, request_id: 'nova-autorizacao', snapshot: next });
+    await render(next);
+    expect((container.querySelector('input[type="checkbox"]') as HTMLInputElement).checked).toBe(false);
+  });
   it('distingue atualização pendente de uma lista ainda não finalizada', async () => {
     await render({ ...snap, session: { ...snap.session, offline_ready: undefined } });
     expect(container.textContent).toContain('Atualização offline pendente');
