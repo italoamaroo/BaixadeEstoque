@@ -39,6 +39,7 @@ export function CounterOpenForm({
     notes: '',
     emergency_reason: '',
   });
+  const [rescue, setRescue] = useState(false);
   const [emergency, setEmergency] = useState(false);
   const fixedContract = useFixedContract(data.contracts);
   const [terminals, setTerminals] = useState<CounterTerminal[] | null>(null);
@@ -94,6 +95,7 @@ export function CounterOpenForm({
         application_location_id: null,
         application_location_text: '-',
         notes: f.notes || null,
+        rescue,
         emergency,
         emergency_reason: emergency ? f.emergency_reason.trim() : null,
         requester_employee_id: requester.id,
@@ -227,11 +229,13 @@ export function CounterOpenForm({
         </datalist>
         <FixedField label="Local de aplicação" value="-" hint="Campo fixo." />
         <Textarea label="Observações" value={f.notes} onChange={(e) => set('notes', e.target.value)} maxLength={2000} rows={2} wrapClassName="sm:col-span-2" />
+        <label className="block rounded-lg bg-sky-50 p-3 text-sm"><input type="checkbox" className="mr-2" checked={rescue} onChange={(e) => { setRescue(e.target.checked); if (e.target.checked) setEmergency(false); }} />Retirada para socorro — aguarda retorno</label>
         <EmergencyFields
           emergency={emergency}
           reason={f.emergency_reason}
           onEmergency={(v) => {
             setEmergency(v);
+            if (v) setRescue(false);
             setErrors((e) => ({ ...e, emergency_reason: '' }));
           }}
           onReason={(v) => set('emergency_reason', v)}

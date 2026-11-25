@@ -139,10 +139,11 @@ export function StepDetails({ draft, update, next, back }: StepProps) {
             wrapClassName="sm:col-span-2"
             error={errors.notes}
           />
+          <label className="rounded-xl bg-sky-50 p-4 text-sm sm:col-span-2"><input type="checkbox" className="mr-2" checked={Boolean(d.rescue)} onChange={(e) => update({ details: { ...d, rescue: e.target.checked, emergency: e.target.checked ? false : d.emergency } })} />Retirada para socorro — aguarda retorno antes do lançamento</label>
           <EmergencyFields
             emergency={Boolean(d.emergency)}
             reason={d.emergency_reason ?? ''}
-            onEmergency={(v) => set('emergency', v)}
+            onEmergency={(v) => update({ details: { ...d, emergency: v, rescue: v ? false : d.rescue } })}
             onReason={(v) => set('emergency_reason', v)}
             error={errors.emergency_reason}
             className="sm:col-span-2"

@@ -52,6 +52,7 @@ export function StepReview({ draft, update, goTo, back, rules, onCreated }: Step
     application_location_id: d.application_location_id || null,
     application_location_text: d.application_location_id ? null : d.application_location_text || '-',
     notes: d.notes || null,
+    rescue: Boolean(d.rescue),
     emergency: Boolean(d.emergency),
     emergency_reason: d.emergency ? (d.emergency_reason ?? '').trim() : null,
     requester_employee_id: draft.requester?.id,
@@ -184,6 +185,7 @@ export function StepReview({ draft, update, goTo, back, rules, onCreated }: Step
             <KeyValue label="Ativo fixo" value={d.fixed_asset_text} />
             <KeyValue label="Local de aplicação" value={name(data.application_locations, d.application_location_id) ?? d.application_location_text} />
             <KeyValue label="Observações" value={d.notes} className="col-span-2 sm:col-span-3" />
+            {d.rescue && <KeyValue label="Tipo" value="Socorro — aguarda conferência do retorno" />}
             {d.emergency && (
               <KeyValue
                 label="ME emergencial (só controle)"

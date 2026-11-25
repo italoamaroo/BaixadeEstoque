@@ -45,7 +45,7 @@ export function StepSuccess({ created, onNew }: { created: CreatedInfo; onNew: (
           <StatusBadge status={created.status as MovementStatus} emergency={created.emergency} />
         </div>
         <p className="mt-4 text-sm text-slate-500">
-          {created.emergency
+          {created.status === 'aguardando_retorno' ? 'Socorro registrado. Aguarda conferência do retorno antes de seguir para lançamento.' : created.emergency
             ? 'ME emergencial registrada só para controle: não vai para a equipe de SA nem para a baixa no ERP.'
             : created.status === 'sa_informada'
               ? 'A movimentação já aparece no painel. Sem ativo fixo, vai direto para o almoxarifado lançar no ERP.'

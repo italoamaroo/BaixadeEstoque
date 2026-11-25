@@ -96,7 +96,7 @@ export function MovementPrint({ detail, signatureUrl, companyName }: Props) {
                 <span className="block text-[9px] text-slate-600">{i.material_code}</span>
               </td>
               <td className={cell}>
-                {i.material_name}
+                {i.material_name}{i.rescue_quantity_out != null && <small className="block">Socorro: retirado {fmtQty(i.rescue_quantity_out)}; devolvido {fmtQty(i.rescue_quantity_returned ?? 0)}; utilizado {fmtQty(i.quantity_delivered)}</small>}
                 {i.notes && <span className="block text-[9px] italic">Obs.: {i.notes}</span>}
               </td>
               <td className={`${cell} text-center`}>{i.unit}</td>

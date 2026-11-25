@@ -19,11 +19,12 @@ interface Props {
   quickSearch?: boolean;
   defaultOpen?: boolean;
   emergencyOnly?: boolean;
+  hideMovementType?: boolean;
 }
 
 
 
-export function FiltersPanel({ value, onApply, quickSearch = true, defaultOpen = false, emergencyOnly = false }: Props) {
+export function FiltersPanel({ value, onApply, quickSearch = true, defaultOpen = false, emergencyOnly = false, hideMovementType = false }: Props) {
   const { warehouses } = useAuth();
   const [draft, setDraft] = useState<MovementFilters>(value);
   const [open, setOpen] = useState(defaultOpen);
@@ -167,7 +168,7 @@ export function FiltersPanel({ value, onApply, quickSearch = true, defaultOpen =
               </option>
             ))}
           </Select>
-          {!emergencyOnly && <Select label="Tipo de ME" value={draft.emergency} onChange={(e) => set('emergency', e.target.value as MovementFilters['emergency'])}>
+          {!emergencyOnly && !hideMovementType && <Select label="Tipo de ME" value={draft.emergency} onChange={(e) => set('emergency', e.target.value as MovementFilters['emergency'])}>
             <option value="">Todas</option>
             <option value="nao">Normais</option>
             <option value="sim">Emergenciais (só controle)</option>

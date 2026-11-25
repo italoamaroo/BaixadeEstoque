@@ -1,6 +1,7 @@
 import type { AppRole, MovementStatus } from '@/types/db';
 
 export const STATUS_LABELS: Record<MovementStatus, string> = {
+  aguardando_retorno: 'Aguardando retorno do socorro',
   rascunho: 'Em separação',
   aguardando_assinatura: 'Aguardando confirmação',
   aguardando_aprovacao: 'Aguardando aprovação',
@@ -12,6 +13,7 @@ export const STATUS_LABELS: Record<MovementStatus, string> = {
 
 /** Classes de cor por status: azul = em andamento, laranja = pendência, verde = concluído, vermelho = cancelado. */
 export const STATUS_STYLES: Record<MovementStatus, string> = {
+  aguardando_retorno: 'bg-sky-50 text-sky-800 ring-sky-300',
   rascunho: 'bg-slate-100 text-slate-700 ring-slate-300',
   aguardando_assinatura: 'bg-amber-50 text-amber-800 ring-amber-300',
   aguardando_aprovacao: 'bg-amber-50 text-amber-800 ring-amber-300',
@@ -22,6 +24,7 @@ export const STATUS_STYLES: Record<MovementStatus, string> = {
 };
 
 export const STATUS_ORDER: MovementStatus[] = [
+  'aguardando_retorno',
   'aguardando_aprovacao',
   'aguardando_sa',
   'sa_informada',

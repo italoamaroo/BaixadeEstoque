@@ -31,15 +31,16 @@ const SORTABLE: Record<string, string> = {
   updated_at: 'Última alteração',
 };
 
-export function MovementsPage({ emergencyOnly = false }: { emergencyOnly?: boolean }) {
+export function MovementsPage({ emergencyOnly = false, rescueOnly = false }: { emergencyOnly?: boolean; rescueOnly?: boolean }) {
   const { can } = useAuth();
   const navigate = useNavigate();
   useHeaderWarehouseFilter();
   const [params, setParams] = useSearchParams();
   const filters = useMemo(() => {
     const parsed = filtersFromSearchParams(params);
+    if (rescueOnly) return { ...parsed, rescue: 'sim' as const, emergency: 'nao' as const };
     return emergencyOnly ? { ...parsed, emergency: 'sim' as const, pending_sa: false, sa_number: '' } : parsed;
-  }, [params, emergencyOnly]);
+  }, [params, emergencyOnly, rescueOnly]);
   const page = Number(params.get('pagina') ?? 1) || 1;
   const pageSize = Number(params.get('por_pagina') ?? 25) || 25;
   const sort = params.get('ordem') ?? 'movement_at';
@@ -75,7 +76,7 @@ export function MovementsPage({ emergencyOnly = false }: { emergencyOnly?: boole
   useRealtimeMovements(() => void load());
 
   const setQuery = (f: MovementFilters, extra: Record<string, string> = {}) => {
-    const p = filtersToSearchParams(emergencyOnly ? { ...f, emergency: 'sim', pending_sa: false, sa_number: '' } : f);
+    const p = filtersToSearchParams(rescueOnly ? { ...f, rescue: 'sim', emergency: 'nao' } : emergencyOnly ? { ...f, emergency: 'sim', pending_sa: false, sa_number: '' } : f);
     const merged: Record<string, string> = { ordem: sort, dir, por_pagina: String(pageSize), ...extra };
     for (const [k, v] of Object.entries(merged)) p.set(k, v);
     setParams(p, { replace: true });
@@ -110,8 +111,8 @@ export function MovementsPage({ emergencyOnly = false }: { emergencyOnly?: boole
   return (
     <div>
       <PageHeader
-        title={emergencyOnly ? 'Emergenciais' : 'Movimentações'}
-        subtitle={emergencyOnly ? 'MEs emergenciais para controle: consulte os materiais retirados e o motivo de cada saída.' : 'Todas as MEs dos estoques que você pode consultar.'}
+        title={rescueOnly ? 'Socorros' : emergencyOnly ? 'Emergenciais' : 'Movimentações'}
+        subtitle={rescueOnly ? 'Retiradas para socorro: confira o retorno para encaminhar somente o material utilizado à equipe de lançamento.' : emergencyOnly ? 'MEs emergenciais para controle: consulte os materiais retirados e o motivo de cada saída.' : 'Todas as MEs dos estoques que você pode consultar.'}
         actions={
           <>
             {can('exportExcel') && (
@@ -120,16 +121,17 @@ export function MovementsPage({ emergencyOnly = false }: { emergencyOnly?: boole
               </LinkButton>
             )}
             {can('createMovement') && (
-              <LinkButton to="/nova-saida" icon={<PackageMinus className="h-4 w-4" />}>
-                Nova saída
+              <LinkButton to={rescueOnly ? '/nova-saida?tipo=socorro' : '/nova-saida'} icon={<PackageMinus className="h-4 w-4" />}>
+                {rescueOnly ? 'Novo socorro' : 'Nova saída'}
               </LinkButton>
             )}
           </>
         }
       />
 
-      <FiltersPanel emergencyOnly={emergencyOnly} value={filters} onApply={(f) => setQuery(f, { pagina: '1' })} />
+      <FiltersPanel hideMovementType={rescueOnly} emergencyOnly={emergencyOnly} value={filters} onApply={(f) => setQuery(f, { pagina: '1' })} />
 
+      {rescueOnly && <Alert>As MEs aguardam o retorno. Quantidades devolvidas ficam no histórico; somente o utilizado segue para SA / ERP.</Alert>}
       {emergencyOnly && (
         <div className="mt-4 space-y-4">
           <Alert tone="warning">Saídas emergenciais não exigem SA nem baixa no ERP. Consulte os detalhes da ME para ver quantidades, assinatura e evidências autorizadas.</Alert>
@@ -207,7 +209,7 @@ export function MovementsPage({ emergencyOnly = false }: { emergencyOnly?: boole
                         </>
                       ) : <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs">{m.sa_number ?? '—'}</td>}
                       <td className="px-3 py-2.5">
-                        <StatusBadge status={m.status} emergency={m.is_emergency} />
+                        <StatusBadge status={m.status} emergency={m.is_emergency} />{m.is_rescue && <span className="ml-2 text-xs font-semibold text-sky-700">{m.rescue_returned_at && Number(m.total_delivered) === 0 ? 'Socorro · sem consumo' : 'Socorro'}</span>}
                       </td>
                       <td className="max-w-[140px] truncate px-3 py-2.5 text-slate-600">{m.storekeeper_name}</td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-xs text-slate-500">
@@ -242,7 +244,7 @@ export function MovementsPage({ emergencyOnly = false }: { emergencyOnly?: boole
                   <Link to={`/movimentacoes/${m.id}`} className="block px-4 py-3 hover:bg-slate-50">
                     <div className="flex items-start justify-between gap-2">
                       <span className="font-mono text-sm font-semibold text-brand-700">{m.me_number}</span>
-                      <StatusBadge status={m.status} emergency={m.is_emergency} />
+                      <StatusBadge status={m.status} emergency={m.is_emergency} />{m.is_rescue && <span className="ml-2 text-xs font-semibold text-sky-700">{m.rescue_returned_at && Number(m.total_delivered) === 0 ? 'Socorro · sem consumo' : 'Socorro'}</span>}
                     </div>
                     <p className="mt-1 text-sm text-slate-900">{m.requester_name}</p>
                     <p className="truncate text-xs text-slate-500">{m.materials_summary}</p>
