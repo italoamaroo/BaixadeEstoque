@@ -1,6 +1,7 @@
 export type AppRole = 'almoxarife' | 'equipe_sa' | 'gestor' | 'admin' | 'terminal';
 
 export type MovementStatus =
+  | 'aguardando_retorno'
   | 'rascunho'
   | 'aguardando_assinatura'
   | 'aguardando_aprovacao'
@@ -156,11 +157,16 @@ export interface MovementRow {
   updated_at: string;
   updated_by: string | null;
   updated_by_name: string | null;
+  is_rescue?: boolean;
+  rescue_returned_at?: string | null;
+  rescue_return_note?: string | null;
   is_emergency?: boolean;
   emergency_reason?: string | null;
 }
 
 export interface MovementItem {
+  rescue_quantity_out?: number | null;
+  rescue_quantity_returned?: number | null;
   id: string;
   movement_id: string;
   line_number: number;

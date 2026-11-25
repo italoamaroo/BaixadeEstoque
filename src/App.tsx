@@ -68,6 +68,7 @@ function AppRoutes() {
               <Route path="balcao" element={<RequirePermission perm="useCounter"><CounterPage /></RequirePermission>} />
               <Route path="balcao/:id" element={<RequirePermission perm="useCounter"><CounterPage /></RequirePermission>} />
               <Route path="nova-saida" element={<RequirePermission perm="createMovement"><NewMovementPage /></RequirePermission>} />
+              <Route path="socorros" element={<RequirePermission perm="viewMovements"><MovementsPage rescueOnly /></RequirePermission>} />
               <Route path="emergenciais" element={<RequirePermission perm="viewMovements"><EmergencyMovementsPage /></RequirePermission>} />
               <Route path="movimentacoes" element={<RequirePermission perm="viewMovements"><MovementsPage /></RequirePermission>} />
               <Route path="movimentacoes/:id" element={<RequirePermission perm="viewMovements"><MovementDetailPage /></RequirePermission>} />

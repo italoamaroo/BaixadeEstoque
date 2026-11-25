@@ -89,6 +89,11 @@ export const updateMyProfile = (full_name: string, default_warehouse_id: string 
 // ---------------------------------------------------------------------------
 // Movimentações
 // ---------------------------------------------------------------------------
+async function ensureRescueReady() {
+  try { if (!await rpc<boolean>('rescue_ready')) throw new Error('not ready'); }
+  catch (err) { if (isNetworkError(err)) throw err; throw new Error('Socorros ainda não estão disponíveis. Aplique a migração 31 no Supabase e confirme sua sessão.'); }
+}
+
 export interface SearchResult {
   total: number;
   page: number;
@@ -96,14 +101,16 @@ export interface SearchResult {
   rows: MovementRow[];
 }
 
-export const searchMovements = (filters: Partial<MovementFilters>, page: number, pageSize: number, sort: string, dir: 'asc' | 'desc') =>
-  rpc<SearchResult>('search_movements', {
+export const searchMovements = async (filters: Partial<MovementFilters>, page: number, pageSize: number, sort: string, dir: 'asc' | 'desc') => {
+  if (filters.rescue) await ensureRescueReady();
+  return rpc<SearchResult>('search_movements', {
     p_filters: toRpcFilters(filters),
     p_page: page,
     p_page_size: pageSize,
     p_sort: sort,
     p_dir: dir,
   });
+};
 
 export const getDashboard = (filters: Partial<MovementFilters>) =>
   rpc<DashboardData>('dashboard_stats', { p_filters: toRpcFilters(filters) });
@@ -210,8 +217,10 @@ export interface CreateMovementResult {
   created: boolean;
 }
 
-export const createMovement = (payload: Record<string, unknown>) =>
-  rpc<CreateMovementResult>('create_movement', { p_payload: payload });
+export const createMovement = async (payload: Record<string, unknown>) => {
+  if (payload.rescue) await ensureRescueReady();
+  return rpc<CreateMovementResult>('create_movement', { p_payload: payload });
+};
 
 export const approveMovement = (id: string, notes?: string) => rpc<unknown>('approve_movement', { p_id: id, p_notes: notes ?? null });
 export const informSa = (id: string, sa: string, justification?: string) =>
@@ -631,6 +640,7 @@ export interface CounterOpenPayload {
   application_location_id?: string | null;
   application_location_text?: string | null;
   notes?: string | null;
+  rescue?: boolean;
   emergency?: boolean;
   emergency_reason?: string | null;
   requester_employee_id: string;
@@ -638,11 +648,13 @@ export interface CounterOpenPayload {
   reuse_terminal?: boolean;
 }
 
-export const counterOpen = (payload: CounterOpenPayload) =>
-  rpc<{ id: string; me_number: string; session_id: string; pairing_code: string; terminal_paired: boolean; created: boolean }>(
+export const counterOpen = async (payload: CounterOpenPayload) => {
+  if (payload.rescue) await ensureRescueReady();
+  return rpc<{ id: string; me_number: string; session_id: string; pairing_code: string; terminal_paired: boolean; created: boolean }>(
     'counter_open',
     { p_payload: payload },
   );
+};
 
 export const counterAdd = (payload: {
   movement_id: string;
@@ -1096,3 +1108,5 @@ export interface AdditionalRetentionSummary {
   offline_scope: string;
 }
 export const getAdditionalRetentionSummary = () => rpc<AdditionalRetentionSummary>('additional_retention_summary');
+
+export const returnRescue = (id: string, items: { id: string; used: number }[], note: string) => rpc<{ id: string; status: string }>('rescue_return', { p_id: id, p_items: items, p_note: note });

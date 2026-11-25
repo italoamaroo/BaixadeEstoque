@@ -16,10 +16,12 @@ export const movementDetailsSchema = z
   application_location_text: optionalText(120, 'Local de aplicação'),
   notes: optionalText(2000, 'Observações'),
   /** ME emergencial: somente controle (não vai para a SA nem para a baixa no ERP) */
+  rescue: z.boolean().optional(),
   emergency: z.boolean().optional(),
   emergency_reason: optionalText(500, 'Motivo da emergência'),
   })
   .superRefine((v, ctx) => {
+    if (v.rescue && v.emergency) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['emergency'], message: 'Socorro e emergencial são tipos separados.' });
     if (v.emergency && (v.emergency_reason ?? '').trim().length < 5) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['emergency_reason'], message: 'Informe o motivo da emergência (mínimo de 5 caracteres).' });
     }

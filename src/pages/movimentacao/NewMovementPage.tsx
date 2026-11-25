@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Check, RotateCcw } from 'lucide-react';
 import clsx from 'clsx';
@@ -41,6 +42,8 @@ export interface CreatedInfo {
 }
 
 export function NewMovementPage() {
+  const [searchParams] = useSearchParams();
+  const rescueRequested = searchParams.get('tipo') === 'socorro';
   const { userId, settings } = useAuth();
   const { current, options } = useWarehouse();
   const [draft, setDraft] = useState<MovementDraft | null>(null);
@@ -71,8 +74,10 @@ export function NewMovementPage() {
       return;
     }
     const whId = current?.id ?? (options.length === 1 ? options[0].id : '');
-    setDraft(emptyDraft(whId));
-  }, [userId, current, options, draft]);
+    const fresh = emptyDraft(whId);
+    fresh.details.rescue = rescueRequested;
+    setDraft(fresh);
+  }, [userId, current, options, draft, rescueRequested]);
 
   useEffect(() => {
     if (userId && draft && !created) saveDraft(userId, draft);

@@ -25,6 +25,7 @@ export interface MovementFilters {
   pending_sa: boolean;
   /** '' = todas · 'sim' = só emergenciais · 'nao' = só normais */
   emergency: '' | 'sim' | 'nao';
+  rescue?: '' | 'sim' | 'nao';
   q: string;
 }
 
@@ -49,6 +50,7 @@ export const EMPTY_FILTERS: MovementFilters = {
   responsible_user_id: '',
   pending_sa: false,
   emergency: '',
+  rescue: '',
   q: '',
 };
 

@@ -1,3 +1,4 @@
+import { RescueReturnCard } from '@/components/RescueReturnCard';
 import { MovementRetentionCard } from '@/components/MovementRetentionCard';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -330,12 +331,12 @@ export function MovementDetailPage() {
                   Duplicar
                 </Button>
               )}
-              {!isCancelled && can('correctMovement') && (
+              {!m.is_rescue && !isCancelled && can('correctMovement') && (
                 <Button variant="secondary" icon={<Wrench className="h-4 w-4" />} onClick={() => setModal('correct')}>
                   Corrigir
                 </Button>
               )}
-              {canCancel && (
+              {canCancel && m.status !== 'aguardando_retorno' && (
                 <Button variant="danger" icon={<Ban className="h-4 w-4" />} onClick={() => setModal('cancel')}>
                   Cancelar ME
                 </Button>
@@ -352,6 +353,7 @@ export function MovementDetailPage() {
           </div>
         )}
 
+        {m.is_rescue && <RescueReturnCard movement={m} items={detail.items} canReturn={can('createMovement')} onSaved={() => void load()} />}
         {m.is_emergency && (
           <Alert tone="warning" title="ME emergencial · somente controle">
             Não passa pela equipe de SA nem pela baixa no ERP. Motivo: {m.emergency_reason}
@@ -465,7 +467,7 @@ export function MovementDetailPage() {
                       <th className="px-3 py-2.5 text-left">Material</th>
                       <th className="px-3 py-2.5 text-left">Unid.</th>
                       <th className="px-3 py-2.5 text-right">Qtd. sol.</th>
-                      <th className="px-3 py-2.5 text-right">Qtd. atd.</th>
+                      <th className="px-3 py-2.5 text-right">{m.is_rescue && m.rescue_returned_at ? 'Utilizado (lançamento)' : 'Qtd. atd.'}</th>
                       <th className="px-3 py-2.5 text-left">Localiz.</th>
                       <th className="px-3 py-2.5 text-left">Conta</th>
                       <th className="px-3 py-2.5 text-left">Inclusão</th>
@@ -485,7 +487,7 @@ export function MovementDetailPage() {
                           </td>
                           <td className="px-3 py-2.5">{i.unit}</td>
                           <td className="px-3 py-2.5 text-right tabular-nums">{fmtQty(i.quantity_requested)}</td>
-                          <td className={`px-3 py-2.5 text-right font-semibold tabular-nums ${short ? 'text-orange-700' : ''}`}>{fmtQty(i.quantity_delivered)}</td>
+                          <td className={`px-3 py-2.5 text-right font-semibold tabular-nums ${short ? 'text-orange-700' : ''}`}>{fmtQty(i.quantity_delivered)}{i.rescue_quantity_out != null && <span className="block text-xs font-normal text-slate-500">Retirado: {fmtQty(i.rescue_quantity_out)} · Devolvido: {fmtQty(i.rescue_quantity_returned ?? 0)}</span>}</td>
                           <td className="px-3 py-2.5">{i.location ?? '—'}</td>
                           <td className="px-3 py-2.5 text-xs">{i.account_code ? `${i.account_code} – ${i.account_name ?? ''}` : '—'}</td>
                           <td className="px-3 py-2.5 text-xs text-slate-500">{i.entry_method === 'qr_code' ? 'QR Code' : 'Pesquisa'}</td>
