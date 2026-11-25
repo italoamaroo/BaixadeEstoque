@@ -7,7 +7,7 @@ Decisão do responsável: **antes da queda**, o almoxarife prepara e autoriza a 
 1. Aplicar integralmente `supabase/sql/32_tablet_offline.sql` após a 31 no Supabase. O instalador de bancos novos inclui `07o_tablet_offline.sql`.
 2. Publicar o aplicativo e atualizar o tablet ainda com internet.
 3. O almoxarife abre a ME no balcão, pareia o terminal e finaliza a separação. A lista final deve aparecer no tablet com o solicitante correto.
-4. Abrir **Retirada sem internet** para conferir que a lista autorizada já está disponível neste aparelho. Se ainda não houve finalização/pareamento ou faltar a migração, a tela bloqueia a confirmação e explica o preparo necessário.
+4. Abrir **Retirada sem internet** para conferir que a lista autorizada já está disponível neste aparelho. Se a tela já estiver aberta, a lista aparece automaticamente ao chegar a autorização; o botão **Verificar lista autorizada** permite consultar novamente sem voltar ao balcão. Se ainda não houve finalização/pareamento ou faltar a migração, a tela bloqueia a confirmação e explica o preparo necessário.
 
 O aparelho guarda somente a lista pareada, sem copiar todos os funcionários ou todas as MEs do estoque. A cópia é vinculada à conta, vale até sete dias desde a última atualização e sai do cache no logout. O código de pareamento é removido da cópia. Uma lista reaberta, cancelada ou substituída invalida a autorização local quando o servidor é consultado.
 

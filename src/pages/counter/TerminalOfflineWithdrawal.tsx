@@ -7,17 +7,19 @@ import { loadTerminalCopy, type AuthorizedTerminalCopy } from '@/lib/terminalOff
 import { enqueueMovement, syncQueue } from '@/lib/offlineQueue';
 import { fmtDateTime, fmtQty } from '@/lib/format';
 import { errorMessage } from '@/lib/errors';
+import type { CounterSnapshot } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Alert, Card, CardHeader, EmptyState } from '@/components/ui/Card';
 import { SignaturePad } from '@/components/SignaturePad';
 import { PhotoCapture } from '@/components/PhotoCapture';
 
-export function TerminalOfflineWithdrawal({ onBack }: { onBack: () => void }) {
+export function TerminalOfflineWithdrawal({ onBack, sourceSnapshot, onRefresh }: { onBack: () => void; sourceSnapshot?: CounterSnapshot | null; onRefresh?: () => Promise<void> }) {
   const { userId } = useAuth();
   const online = useOnlineStatus();
   const { items: queued } = useOfflineQueue();
   const [copy, setCopy] = useState<AuthorizedTerminalCopy>();
   const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -35,7 +37,7 @@ export function TerminalOfflineWithdrawal({ onBack }: { onBack: () => void }) {
     if (!userId) { setLoading(false); return; }
     loadTerminalCopy(userId).then((v) => { if (alive) { setCopy(v); setLoading(false); } }, () => { if (alive) { setError('Não foi possível ler a lista preparada neste aparelho.'); setLoading(false); } });
     return () => { alive = false; };
-  }, [userId]);
+  }, [userId, sourceSnapshot?.movement.id, sourceSnapshot?.session.version, sourceSnapshot?.session.status, sourceSnapshot?.session.offline_ready]);
   const existing = queued.find((q) => q.kind === 'counter_confirmation' && q.payload.movement_id === copy?.snapshot.movement.id);
   const save = async () => {
     if (!copy || !userId || lock.current) return;
@@ -59,7 +61,26 @@ export function TerminalOfflineWithdrawal({ onBack }: { onBack: () => void }) {
     } catch (e) { setError(errorMessage(e)); } finally { lock.current = false; setBusy(false); }
   };
   if (loading) return <p className="p-6 text-slate-500">Carregando lista autorizada…</p>;
-  if (!copy) return <Card><EmptyState icon={<CloudOff className="h-12 w-12" />} title="Nenhuma lista autorizada neste tablet" description="Com internet, o almoxarife precisa parear este tablet, finalizar a separação e aguardar a lista aparecer aqui. Só essa lista poderá ser confirmada sem internet. A atualização 32 do banco também precisa estar aplicada." action={<Button onClick={onBack}>Voltar ao balcão</Button>} />{error && <Alert tone="error">{error}</Alert>}</Card>;
+  if (!copy) {
+    const updateNeeded = sourceSnapshot && !sourceSnapshot.session.offline_ready;
+    const preparing = sourceSnapshot?.session.status === 'em_separacao';
+    const check = async () => {
+      if (!userId || !online) return;
+      setChecking(true); setError(null);
+      try {
+        await onRefresh?.();
+        setCopy(await loadTerminalCopy(userId));
+      } catch (e) { setError(errorMessage(e, 'Não foi possível verificar a lista. Tente novamente com internet.')); }
+      finally { setChecking(false); }
+    };
+    return <div className="space-y-4"><h1 className="text-2xl font-bold">Retirada sem internet</h1><Card>
+      <EmptyState icon={<CloudOff className="h-12 w-12" />} title={updateNeeded ? 'Atualização offline pendente' : preparing ? 'Aguardando o almoxarife finalizar a lista' : 'Aguardando lista autorizada'} description={updateNeeded ? 'O sistema ainda não habilitou a confirmação offline deste tablet. Peça ao administrador para concluir a atualização.' : 'Esta tela permanece aberta. A lista aparecerá aqui depois que o almoxarife preparar a retirada com internet.'} />
+      <ol className="mx-auto max-w-xl list-decimal space-y-2 pl-6 text-sm text-slate-600"><li>Com internet, o almoxarife abre a ME e seleciona este tablet no balcão.</li><li>Registra os materiais e clica em <strong>Finalizar separação</strong>.</li><li>A lista aparece no tablet para você conferir e assinar, mesmo se a conexão cair depois.</li></ol>
+      {!online && <div className="mt-4"><Alert tone="warning">Reconecte este tablet para receber a lista autorizada. Ainda não há uma cópia preparada neste aparelho.</Alert></div>}
+      {error && <div className="mt-4"><Alert tone="error">{error}</Alert></div>}
+      <div className="mt-5 flex flex-wrap justify-center gap-3"><Button loading={checking} disabled={!online} onClick={() => void check()}>Verificar lista autorizada</Button><Button variant="secondary" onClick={onBack}>Voltar ao balcão</Button></div>
+    </Card></div>;
+  }
   const { movement: m, items } = copy.snapshot;
   const kind = m.is_rescue ? 'Socorro' : m.is_emergency ? 'Emergencial' : 'Normal';
   if (saved || existing) return <div className="space-y-4"><Card><CheckCircle2 className="mb-3 h-12 w-12 text-emerald-600" /><h1 className="text-xl font-bold">{existing?.status === 'erro' ? 'Confirmação guardada — conferir envio' : 'Confirmação guardada neste tablet'}</h1><p className="mt-2">ME {m.me_number}. A assinatura e as evidências aguardam confirmação do servidor.</p><p className="mt-2 text-sm text-slate-500">A lista não será criada novamente. Quando a conexão voltar, será enviada para esta mesma ME.</p>{existing?.last_error && <div className="mt-3"><Alert tone="error">{existing.last_error}</Alert></div>}<div className="mt-4"><Button onClick={onBack}>Voltar ao balcão</Button></div></Card></div>;

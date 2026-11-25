@@ -107,7 +107,7 @@ export function TerminalPage() {
       </header>
       <OfflineSync terminal />
       <main className="mx-auto w-full max-w-6xl flex-1 p-4 sm:p-6">
-        {mode === 'offline' ? <TerminalOfflineWithdrawal key={userId} onBack={() => setParams({})} /> : mode === 'envios' ? <TerminalOfflineQueue /> : loading && !snapshot ? (
+        {mode === 'offline' ? <TerminalOfflineWithdrawal key={userId} sourceSnapshot={snapshot} onRefresh={refresh} onBack={() => setParams({})} /> : mode === 'envios' ? <TerminalOfflineQueue /> : loading && !snapshot ? (
           <PageLoader label="Conectando…" />
         ) : hide || !snapshot || switching ? (
           <Pairing
