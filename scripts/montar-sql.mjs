@@ -4,7 +4,7 @@ import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const dir = join(process.cwd(), 'supabase', 'sql');
-const files = readdirSync(dir).filter((f) => /^0[1-8][bcdefghijklmnnnnnn]?_.*\.sql$/.test(f)).sort();
+const files = readdirSync(dir).filter((f) => /^0[1-8][bcdefghijklmnoonnnnn]?_.*\.sql$/.test(f)).sort();
 const header = `-- =====================================================================
 -- INSTALAÇÃO COMPLETA (gerado por scripts/montar-sql.mjs — não edite à mão)
 -- Arquivos: ${files.join(', ')}

@@ -10,10 +10,11 @@ interface Props {
   registerExporter: (fn: () => string | null) => void;
   initialDataUrl?: string | null;
   disabled?: boolean;
+  compact?: boolean;
 }
 
 /** Área de assinatura em canvas para dedo ou caneta (signature_pad). */
-export function SignaturePad({ onChange, registerExporter, initialDataUrl, disabled }: Props) {
+export function SignaturePad({ onChange, registerExporter, initialDataUrl, disabled, compact = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const padRef = useRef<SignaturePadLib | null>(null);
   const [empty, setEmpty] = useState(true);
@@ -86,7 +87,7 @@ export function SignaturePad({ onChange, registerExporter, initialDataUrl, disab
       <div className="relative rounded-xl border-2 border-dashed border-slate-300 bg-white">
         <canvas
           ref={canvasRef}
-          className="block h-56 w-full touch-none sm:h-64"
+          className={`block w-full touch-none ${compact ? 'h-44' : 'h-56 sm:h-64'}`}
           aria-label="Área de assinatura. Assine com o dedo ou caneta."
           role="img"
         />

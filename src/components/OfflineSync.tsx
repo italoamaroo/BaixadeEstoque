@@ -15,11 +15,11 @@ import { fmtDateTime } from '@/lib/format';
  * - envia as saídas guardadas assim que a internet volta (e a cada 30 s);
  * - mostra uma faixa com quantas saídas aguardam envio.
  */
-export function OfflineSync() {
+export function OfflineSync({ terminal = false }: { terminal?: boolean }) {
   const { userId, settings, can } = useAuth();
   const online = useOnlineStatus();
   const { items, error } = useOfflineQueue();
-  const enabled = Boolean(userId) && can('createMovement');
+  const enabled = Boolean(userId) && (can('createMovement') || (terminal && can('counterTerminal')));
   const running = useRef(false);
 
   const run = useCallback(async () => {
@@ -34,19 +34,19 @@ export function OfflineSync() {
         });
       }
       if (r.failed.length) {
-        toast.error(`${r.failed.length} saída(s) guardada(s) não puderam ser enviadas. Veja em "Saídas offline".`, { duration: 10000 });
+        toast.error(`${r.failed.length} saída(s) guardada(s) não puderam ser enviadas. Veja em "${terminal ? 'Saídas aguardando envio' : 'Saídas offline'}".`, { duration: 10000 });
       }
     } catch {
       // Mantém a rotina de sincronização ativa para a próxima tentativa.
     } finally {
       running.current = false;
     }
-  }, [enabled, userId, settings?.timezone]);
+  }, [enabled, userId, settings?.timezone, terminal]);
 
   // cópia dos cadastros (a cada 6 h, com internet)
   useEffect(() => {
-    if (enabled && online) void refreshOfflineCache().catch(() => undefined);
-  }, [enabled, online]);
+    if (enabled && online && !terminal) void refreshOfflineCache().catch(() => undefined);
+  }, [enabled, online, terminal]);
 
   // envio automático
   useEffect(() => {
@@ -58,12 +58,12 @@ export function OfflineSync() {
 
   if (!enabled || (!error && items.length === 0)) return null;
   if (error) {
-    return <Link to="/saidas-offline" className="block bg-red-600 px-4 py-2 text-center text-sm font-semibold text-white print:hidden">Não foi possível consultar as saídas guardadas neste aparelho</Link>;
+    return <Link to={terminal ? '/terminal?modo=envios' : '/saidas-offline'} className="block bg-red-600 px-4 py-2 text-center text-sm font-semibold text-white print:hidden">Não foi possível consultar as saídas guardadas neste aparelho</Link>;
   }
   const errors = items.filter((i) => i.status === 'erro').length;
   return (
     <Link
-      to="/saidas-offline"
+      to={terminal ? '/terminal?modo=envios' : '/saidas-offline'}
       className={
         'flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold print:hidden ' +
         (errors ? 'bg-red-600 text-white' : online ? 'bg-sky-600 text-white' : 'bg-amber-500 text-amber-950')
