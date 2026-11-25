@@ -1,5 +1,5 @@
 import { canReviewLocalRetention } from './retention';
-import { createMovement, uploadSignature } from './api';
+import { confirmCounterOffline, uploadPhoto, createMovement, uploadSignature } from './api';
 import { errorMessage, isNetworkError } from './errors';
 import { queueAdd, queueAll, queueDel, queuePut } from './offlineDb';
 import { buildSignaturePath, dataUrlToBlob } from './signature';
@@ -21,6 +21,9 @@ export interface QueuedMovement {
   item_count: number;
   items_summary: string;
   payload: Record<string, unknown>;
+  kind?: 'counter_confirmation';
+  photo_data_url?: string | null;
+  photo_path?: string | null;
   signature_data_url: string;
   signature_signed_at: string | null;
   signature_path: string | null;
@@ -73,6 +76,19 @@ export function syncQueue(userId: string, timeZone = 'America/Recife', includeEr
       if (q.status === 'erro' && !includeErrors) continue;
       const item: QueuedMovement = { ...q, attempts: q.attempts + 1, last_attempt_at: new Date().toISOString() };
       try {
+        if (item.kind === 'counter_confirmation') {
+          const movementId = String(item.payload.movement_id);
+          const path = item.signature_path ?? buildSignaturePath(item.warehouse_code, movementId, timeZone, new Date(String(item.payload.movement_at))).replace('.png', `_${item.id}.png`);
+          if (!item.signature_path) { await uploadSignature(path, dataUrlToBlob(item.signature_data_url)); item.signature_path = path; await queuePut(item); }
+          if (item.photo_data_url && !item.photo_path) {
+            const photoPath = path.replace('assinatura_', 'foto_offline_').replace(/\.png$/, '.jpg');
+            await uploadPhoto(photoPath, dataUrlToBlob(item.photo_data_url)); item.photo_path = photoPath; await queuePut(item);
+          }
+          const res = await confirmCounterOffline(movementId, { ...item.payload, request_id: item.id, signature_path: path, photo_path: item.photo_path ?? null, signed_at: item.signature_signed_at });
+          await queueDel(item.id);
+          result.sent.push({ id: item.id, me_number: res.me_number, offline_at: item.offline_at });
+          continue;
+        }
         const when = new Date(item.offline_at);
         let path = item.signature_path;
         if (!path) {

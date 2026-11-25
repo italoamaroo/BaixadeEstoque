@@ -11,9 +11,11 @@ import { Spinner } from './ui/Spinner';
 export function PhotoCapture({
   onCapture,
   onCameraUnavailable,
+  compact = false,
 }: {
   onCapture: (blob: Blob | null, dataUrl: string | null) => void;
   onCameraUnavailable: (reason: string) => void;
+  compact?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -96,7 +98,7 @@ export function PhotoCapture({
 
   return (
     <div className="space-y-3">
-      <div className="relative mx-auto aspect-[4/3] w-full max-w-md overflow-hidden rounded-2xl bg-slate-900">
+      <div className={`relative mx-auto aspect-[4/3] w-full overflow-hidden rounded-2xl bg-slate-900 ${compact ? 'max-w-[160px]' : 'max-w-md'}`}>
         {state === 'taken' && preview ? (
           <img src={preview} alt="Foto do solicitante" className="h-full w-full object-cover" />
         ) : (

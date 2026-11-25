@@ -593,6 +593,7 @@ export interface CounterSnapshot {
     last_event: string | null;
     last_event_at: string;
     terminal_paired: boolean;
+    offline_ready?: boolean;
     paired_at: string | null;
     pairing_code: string | null;
     pairing_expires_at: string;
@@ -604,6 +605,7 @@ export interface CounterSnapshot {
     status: MovementStatus;
     warehouse_name: string;
     warehouse_code: string;
+    warehouse_id?: string;
     requester_name: string;
     requester_registration: string;
     storekeeper_name: string;
@@ -614,6 +616,7 @@ export interface CounterSnapshot {
     item_count: number;
     total_delivered: number;
     fixed_asset: string | null;
+    is_rescue?: boolean;
     is_emergency?: boolean;
   };
   items: {
@@ -1110,3 +1113,5 @@ export interface AdditionalRetentionSummary {
 export const getAdditionalRetentionSummary = () => rpc<AdditionalRetentionSummary>('additional_retention_summary');
 
 export const returnRescue = (id: string, items: { id: string; used: number }[], note: string) => rpc<{ id: string; status: string }>('rescue_return', { p_id: id, p_items: items, p_note: note });
+
+export const confirmCounterOffline = (id: string, payload: Record<string, unknown>) => rpc<{ id: string; me_number: string; status: string }>('counter_confirm_offline', { p_movement_id: id, p_payload: payload });

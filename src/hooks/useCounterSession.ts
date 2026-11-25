@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { counterSnapshot, type CounterSnapshot } from '@/lib/api';
-import { errorMessage } from '@/lib/errors';
+import { loadTerminalCopy, saveTerminalCopy } from '@/lib/terminalOffline';
+import { isNetworkError, errorMessage } from '@/lib/errors';
 
 /**
  * Mantém a "fotografia" da separação sincronizada nas duas telas do balcão.
@@ -30,11 +31,25 @@ export function useCounterSession(
     }
     const my = ++seq.current;
     try {
+      if (opts.mode === 'terminal' && navigator.onLine === false) {
+        const cached = await loadTerminalCopy(key).catch(() => undefined);
+        if (my === seq.current) { setSnapshot(cached?.snapshot ?? null); setError(cached ? 'Lista autorizada carregada deste aparelho.' : 'Nenhuma lista autorizada foi preparada neste tablet.'); }
+        return;
+      }
       const snap = await counterSnapshot(opts.mode === 'movement' ? key : null);
       if (my !== seq.current) return; // resposta antiga: descarta
+      if (opts.mode === 'terminal') await saveTerminalCopy(key, snap).catch(() => undefined);
+      if (my !== seq.current) return;
       setSnapshot(snap);
       setError(null);
     } catch (e) {
+      if (my !== seq.current) return;
+      if (opts.mode === 'terminal' && isNetworkError(e)) {
+        const cached = await loadTerminalCopy(key).catch(() => undefined);
+        if (my !== seq.current) return;
+        if (cached) setSnapshot(cached.snapshot);
+      }
+      if (opts.mode === 'terminal' && !isNetworkError(e)) await saveTerminalCopy(key, null).catch(() => undefined);
       if (my !== seq.current) return;
       setError(errorMessage(e));
     } finally {
@@ -44,8 +59,11 @@ export function useCounterSession(
   }, [key, opts.mode]);
 
   useEffect(() => {
+    setSnapshot(null);
+    setError(null);
     setLoading(true);
     void refresh();
+    return () => { seq.current++; };
   }, [refresh]);
 
   useEffect(() => {

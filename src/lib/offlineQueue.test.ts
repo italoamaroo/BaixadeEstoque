@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const m = vi.hoisted(() => ({ all: vi.fn(), del: vi.fn(), put: vi.fn(), add: vi.fn(), create: vi.fn(), upload: vi.fn() }));
+const m = vi.hoisted(() => ({ all: vi.fn(), del: vi.fn(), put: vi.fn(), add: vi.fn(), create: vi.fn(), upload: vi.fn(), confirm: vi.fn(), photo: vi.fn() }));
 vi.mock('./offlineDb', () => ({ queueAll: m.all, queueDel: m.del, queuePut: m.put, queueAdd: m.add }));
-vi.mock('./api', () => ({ createMovement: m.create, uploadSignature: m.upload }));
+vi.mock('./api', () => ({ createMovement: m.create, uploadSignature: m.upload, confirmCounterOffline: m.confirm, uploadPhoto: m.photo }));
 import { discardQueued, syncQueue } from './offlineQueue';
 beforeEach(() => { vi.clearAllMocks(); });
 describe('guarda da fila offline', () => {
@@ -22,5 +22,24 @@ describe('guarda da fila offline', () => {
     const r = await syncQueue('u');
     expect(r.sent).toHaveLength(1); expect(m.del).toHaveBeenCalledWith('q');
     expect(m.create.mock.invocationCallOrder[0]).toBeLessThan(m.del.mock.invocationCallOrder[0]);
+  });
+});
+
+describe('confirmação offline do tablet', () => {
+  it('envia para a ME existente sem chamar criação de uma nova saída', async () => {
+    const q = { id: 'receipt-1', user_id: 'terminal', kind: 'counter_confirmation', saved_at: new Date().toISOString(), offline_at: new Date().toISOString(), signature_signed_at: new Date().toISOString(), status: 'pendente', attempts: 0, signature_path: 'MUR/2026/me/signature.png', payload: { movement_id: 'me', movement_at: new Date().toISOString(), version: 4, items: [] } };
+    m.all.mockResolvedValue([q]); m.confirm.mockResolvedValue({ me_number: 'ME-EXISTENTE' });
+    const r = await syncQueue('terminal');
+    expect(r.sent[0].me_number).toBe('ME-EXISTENTE');
+    expect(m.confirm).toHaveBeenCalledWith('me', expect.objectContaining({ request_id: 'receipt-1', version: 4 }));
+    expect(m.create).not.toHaveBeenCalled();
+    expect(m.del).toHaveBeenCalledWith('receipt-1');
+  });
+  it('mantém a confirmação no aparelho quando a lista foi alterada', async () => {
+    const q = { id: 'receipt-2', user_id: 'terminal', kind: 'counter_confirmation', saved_at: new Date().toISOString(), offline_at: new Date().toISOString(), status: 'pendente', attempts: 0, signature_path: 'path', payload: { movement_id: 'me' } };
+    m.all.mockResolvedValue([q]); m.confirm.mockRejectedValue(new Error('A autorização ou lista mudou.'));
+    const r = await syncQueue('terminal');
+    expect(r.failed).toHaveLength(1); expect(m.del).not.toHaveBeenCalled();
+    expect(m.put).toHaveBeenCalledWith(expect.objectContaining({ status: 'erro' }));
   });
 });

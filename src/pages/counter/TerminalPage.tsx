@@ -1,3 +1,6 @@
+import { useSearchParams } from 'react-router-dom';
+import { OfflineSync } from '@/components/OfflineSync';
+import { TerminalOfflineWithdrawal, TerminalOfflineQueue } from './TerminalOfflineWithdrawal';
 import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { CheckCircle2, ClipboardCheck, Hand, Link2, LogOut, PackageCheck, PenLine, ScanFace, ScanLine, ShieldCheck, UserRound, Wifi, WifiOff, XCircle } from 'lucide-react';
@@ -41,6 +44,8 @@ import { PageLoader } from '@/components/ui/Spinner';
  */
 export function TerminalPage() {
   const { userId, displayName, signOut } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const mode = params.get('modo') ?? 'balcao';
   const online = useOnlineStatus();
   const { snapshot, loading, error, live, refresh } = useCounterSession({ mode: 'terminal', userId });
   // depois de confirmada, a ME some do tablet em 5 s (cancelada: 10 s) e volta para "Retirar peças".
@@ -70,16 +75,25 @@ export function TerminalPage() {
   }, [snapshot]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-slate-50 md:flex-row">
+      <aside className="shrink-0 bg-brand-900 p-4 text-white md:w-60">
+        <div className="mb-5 flex items-center gap-3"><PackageCheck className="h-9 w-9" /><div><p className="font-bold">Baixas de Estoque</p><p className="text-xs text-brand-200">Consórcio Recife Ambiental</p></div></div>
+        <nav aria-label="Menu do tablet" className="flex flex-wrap gap-2 md:flex-col">{[
+          ['balcao','Balcão ao vivo'], ['offline','Retirada sem internet'], ['envios','Saídas aguardando envio'],
+        ].map(([value,label]) => <button key={value} type="button" onClick={() => setParams(value === 'balcao' ? {} : { modo: value })} className={clsx('rounded-lg px-3 py-3 text-left text-sm font-semibold', mode === value ? 'bg-white/20 text-white' : 'text-brand-100 hover:bg-white/10')}>{label}</button>)}</nav>
+        <p className="mt-6 hidden text-xs text-brand-200 md:block">Terminal do balcão · estoque autorizado</p>
+      </aside>
+      <section className="min-w-0 flex-1">
       <header className="flex items-center justify-between bg-brand-900 px-4 py-3 text-white">
         <div>
           <p className="font-semibold">Balcão do almoxarifado</p>
           <p className="text-xs text-brand-200">{displayName || 'Terminal do solicitante'}</p>
         </div>
         <div className="flex items-center gap-3">
+          {snapshot?.movement.warehouse_name && <span className="hidden rounded-lg bg-white/10 px-3 py-2 text-sm sm:inline">{snapshot.movement.warehouse_name}</span>}
           <span className={clsx('inline-flex items-center gap-1 text-xs', live && online ? 'text-emerald-300' : 'text-amber-300')}>
             {live && online ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
-            {live && online ? 'Ao vivo' : 'Reconectando…'}
+            {!online ? 'Sem internet' : live ? 'Ao vivo' : 'Reconectando…'}
           </span>
           {!hide && (
             <button type="button" className="rounded-lg px-3 py-2 text-xs font-semibold text-brand-100 ring-1 ring-white/30 hover:bg-white/10" onClick={() => setSwitching((v) => !v)}>
@@ -91,8 +105,9 @@ export function TerminalPage() {
           </button>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-4xl flex-1 p-4 sm:p-6">
-        {loading && !snapshot ? (
+      <OfflineSync terminal />
+      <main className="mx-auto w-full max-w-6xl flex-1 p-4 sm:p-6">
+        {mode === 'offline' ? <TerminalOfflineWithdrawal key={userId} onBack={() => setParams({})} /> : mode === 'envios' ? <TerminalOfflineQueue /> : loading && !snapshot ? (
           <PageLoader label="Conectando…" />
         ) : hide || !snapshot || switching ? (
           <Pairing
@@ -114,6 +129,7 @@ export function TerminalPage() {
       <footer className="px-4 pb-4 text-center text-sm">
         <a href="/aviso-de-privacidade.html" target="_blank" rel="noopener noreferrer" className="font-medium text-brand-700 underline">Aviso de privacidade <span className="sr-only">(abre em nova aba)</span></a>
       </footer>
+      </section>
     </div>
   );
 }
