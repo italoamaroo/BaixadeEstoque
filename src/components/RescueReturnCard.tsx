@@ -18,7 +18,7 @@ export function RescueReturnCard({ movement, items, canReturn, onSaved }: { move
   const editable = canReturn && movement.status === 'aguardando_retorno' && !returned;
   const totalOut = items.reduce((n, i) => n + Number(i.rescue_quantity_out ?? i.quantity_delivered), 0);
   const totalUsed = items.reduce((n, i) => n + Number(i.quantity_delivered), 0);
-  const outcome = !returned ? 'Aguardando retorno' : totalUsed === 0 ? 'Sem consumo — devolução total' : totalUsed === totalOut ? 'Utilizado integralmente' : 'Utilizado em parte';
+  const outcome = !returned ? movement.status === 'aguardando_retorno' ? 'Aguardando retorno' : 'Aguardando confirmação da retirada' : totalUsed === 0 ? 'Sem consumo — devolução total' : totalUsed === totalOut ? 'Utilizado integralmente' : 'Utilizado em parte';
   const save = async () => {
     const rows = items.map((i) => ({ id: i.id, used: parseQty(used[i.id] ?? '') }));
     if (!confirmed || note.trim().length < 5) { setError('Confirme a conferência com o mecânico e descreva o retorno.'); return; }

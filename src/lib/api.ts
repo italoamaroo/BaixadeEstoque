@@ -91,7 +91,7 @@ export const updateMyProfile = (full_name: string, default_warehouse_id: string 
 // ---------------------------------------------------------------------------
 async function ensureRescueReady() {
   try { if (!await rpc<boolean>('rescue_ready')) throw new Error('not ready'); }
-  catch { throw new Error('Socorros ainda não estão disponíveis. Aplique a migração 31 no Supabase e confirme sua sessão.'); }
+  catch (err) { if (isNetworkError(err)) throw err; throw new Error('Socorros ainda não estão disponíveis. Aplique a migração 31 no Supabase e confirme sua sessão.'); }
 }
 
 export interface SearchResult {

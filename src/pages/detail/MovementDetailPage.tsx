@@ -467,7 +467,7 @@ export function MovementDetailPage() {
                       <th className="px-3 py-2.5 text-left">Material</th>
                       <th className="px-3 py-2.5 text-left">Unid.</th>
                       <th className="px-3 py-2.5 text-right">Qtd. sol.</th>
-                      <th className="px-3 py-2.5 text-right">Qtd. atd.</th>
+                      <th className="px-3 py-2.5 text-right">{m.is_rescue && m.rescue_returned_at ? 'Utilizado (lançamento)' : 'Qtd. atd.'}</th>
                       <th className="px-3 py-2.5 text-left">Localiz.</th>
                       <th className="px-3 py-2.5 text-left">Conta</th>
                       <th className="px-3 py-2.5 text-left">Inclusão</th>
