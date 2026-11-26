@@ -46,12 +46,9 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Alert, Card, EmptyState, PageHeader } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/Badge';
-import { Input, Checkbox } from '@/components/ui/Field';
 import { PageLoader, Spinner } from '@/components/ui/Spinner';
 import { CounterOpenForm } from './CounterOpenForm';
 import { counterRequestCancel, counterRequestsPending, type CounterRequest } from '@/lib/api';
-
-const ASK_QTY_KEY = 'baixas-estoque:balcao-perguntar-qtd';
 
 interface Feedback {
   kind: FeedbackKind;
@@ -195,15 +192,6 @@ function ActiveCounter({ movementId, onNew }: { movementId: string; onNew: () =>
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [pending, setPending] = useState(0);
   const [duplicate, setDuplicate] = useState<{ code: string; resp: CounterScanResponse; qty: number } | null>(null);
-  const [askQty, setAskQty] = useState(() => {
-    try {
-      return localStorage.getItem(ASK_QTY_KEY) === 'sim';
-    } catch {
-      return false;
-    }
-  });
-  const [qtyPrompt, setQtyPrompt] = useState<string | null>(null);
-  const [nextQty, setNextQty] = useState('1');
   const [manualOpen, setManualOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -211,7 +199,7 @@ function ActiveCounter({ movementId, onNew }: { movementId: string; onNew: () =>
 
   const status = snapshot?.movement.status;
   const separating = status === 'rascunho';
-  const scannerEnabled = separating && !duplicate && !qtyPrompt && !manualOpen && !finishOpen && !cancelOpen;
+  const scannerEnabled = separating && !duplicate && !manualOpen && !finishOpen && !cancelOpen;
 
   const notify = useCallback((kind: FeedbackKind, title: string, detail?: string) => {
     setFeedback({ kind, title, detail, at: Date.now() });
@@ -272,11 +260,6 @@ function ActiveCounter({ movementId, onNew }: { movementId: string; onNew: () =>
     [movementId, handleResponse, notify],
   );
 
-  const parsedNextQty = () => {
-    const n = Number(String(nextQty).replace(',', '.'));
-    return Number.isFinite(n) && n > 0 ? n : NaN;
-  };
-
   const onScan = useCallback(
     (raw: string) => {
       const code = normalizeScannedCode(raw);
@@ -285,20 +268,9 @@ function ActiveCounter({ movementId, onNew }: { movementId: string; onNew: () =>
         notify('error', 'Sem conexão', 'A leitura não foi registrada. Verifique a internet e bipe novamente.');
         return;
       }
-      if (askQty) {
-        setQtyPrompt(code);
-        return;
-      }
-      const q = parsedNextQty();
-      if (!Number.isFinite(q)) {
-        notify('error', 'Quantidade inválida', 'Corrija a quantidade da próxima leitura.');
-        return;
-      }
-      void send({ code, label: code }, q);
-      setNextQty('1');
+      void send({ code, label: code }, 1);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [askQty, online, send, notify, nextQty],
+    [online, send, notify],
   );
 
   const scanner = useHidScanner(inputRef, {
@@ -405,42 +377,11 @@ function ActiveCounter({ movementId, onNew }: { movementId: string; onNew: () =>
               </div>
               <ScannerState inputRef={inputRef} pending={pending} />
             </div>
-            {!askQty && (
-              <div className="w-36">
-                <Input
-                  label="Qtd. da próxima"
-                  inputMode="decimal"
-                  value={nextQty}
-                  onChange={(e) => setNextQty(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      scanner.focus();
-                      inputRef.current?.focus();
-                    }
-                  }}
-                  inputSize="lg"
-                />
-              </div>
-            )}
             <Button variant="secondary" size="lg" icon={<Search className="h-5 w-5" />} onClick={() => setManualOpen(true)}>
               Pesquisar
             </Button>
           </div>
-          <div className="mt-3">
-            <Checkbox
-              label="Perguntar a quantidade a cada leitura"
-              checked={askQty}
-              onChange={(v) => {
-                setAskQty(v);
-                try {
-                  localStorage.setItem(ASK_QTY_KEY, v ? 'sim' : 'nao');
-                } catch {
-                  /* ignore */
-                }
-              }}
-            />
-          </div>
+          <p className="mt-3 text-sm text-slate-500">Cada leitura inclui 1 unidade automaticamente. Para alterar a quantidade no PC, ajuste a coluna Solicitada; a Atendida acompanha o valor.</p>
           {feedback && <FeedbackBanner feedback={feedback} />}
         </Card>
       )}
@@ -546,20 +487,6 @@ function ActiveCounter({ movementId, onNew }: { movementId: string; onNew: () =>
         </Button>
       </div>
 
-      {/* Quantidade a cada leitura */}
-      <QtyPrompt
-        code={qtyPrompt}
-        onCancel={() => {
-          setQtyPrompt(null);
-          notify('info', 'Leitura descartada');
-        }}
-        onConfirm={(q) => {
-          const code = qtyPrompt!;
-          setQtyPrompt(null);
-          void send({ code, label: code }, q);
-        }}
-      />
-
       {/* Item já incluído */}
       <Modal
         open={Boolean(duplicate)}
@@ -597,8 +524,7 @@ function ActiveCounter({ movementId, onNew }: { movementId: string; onNew: () =>
           autoFocus
           onSelect={(mat) => {
             setManualOpen(false);
-            const q = askQty ? 1 : parsedNextQty();
-            void send({ material_id: mat.id, label: mat.code }, Number.isFinite(q) ? q : 1);
+            void send({ material_id: mat.id, label: mat.code }, 1);
           }}
         />
       </Modal>
@@ -846,7 +772,7 @@ function ItemRow({
       <td className="px-3 py-2 text-slate-500">{item.line_number}</td>
       <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">{item.material_code}</td>
       <td className="px-3 py-2 font-medium text-slate-900">{item.material_name}</td>
-      <td className="px-3 py-2 text-right">{editable ? qtyInput(req, setReq, 'Quantidade solicitada') : fmtQty(item.quantity_requested)}</td>
+      <td className="px-3 py-2 text-right">{editable ? qtyInput(req, (value) => { setReq(value); setDel(value); }, 'Quantidade solicitada') : fmtQty(item.quantity_requested)}</td>
       <td className="px-3 py-2 text-right font-semibold">{editable ? qtyInput(del, setDel, 'Quantidade atendida') : fmtQty(item.quantity_delivered)}</td>
       <td className="px-3 py-2">{item.unit}</td>
       <td className="whitespace-nowrap px-3 py-2 text-slate-500">{fmtTime(item.created_at)}</td>
@@ -868,58 +794,5 @@ function ItemRow({
           ))}
       </td>
     </tr>
-  );
-}
-
-function QtyPrompt({ code, onCancel, onConfirm }: { code: string | null; onCancel: () => void; onConfirm: (q: number) => void }) {
-  const [v, setV] = useState('1');
-  const [err, setErr] = useState<string | null>(null);
-  useEffect(() => {
-    if (code) {
-      setV('1');
-      setErr(null);
-    }
-  }, [code]);
-  const ok = () => {
-    const n = Number(v.replace(',', '.'));
-    if (!Number.isFinite(n) || n <= 0) {
-      setErr('Informe uma quantidade maior que zero.');
-      playFeedback('error');
-      return;
-    }
-    onConfirm(n);
-  };
-  return (
-    <Modal
-      open={Boolean(code)}
-      onClose={onCancel}
-      title="Quantidade"
-      description={code ? `Código lido: ${code}` : undefined}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onCancel}>
-            Descartar leitura
-          </Button>
-          <Button onClick={ok}>Incluir</Button>
-        </>
-      }
-    >
-      <Input
-        label="Quantidade"
-        inputMode="decimal"
-        autoFocus
-        value={v}
-        error={err}
-        onChange={(e) => setV(e.target.value)}
-        onFocus={(e) => e.currentTarget.select()}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            ok();
-          }
-        }}
-        inputSize="lg"
-      />
-    </Modal>
   );
 }
