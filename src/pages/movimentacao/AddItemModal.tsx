@@ -58,7 +58,6 @@ function QtyField({ label, value, onChange, unit }: { label: string; value: stri
 export function AddItemModal({ pending, existing, rules, onCancel, onConfirm }: Props) {
   const [req, setReq] = useState('1');
   const [del, setDel] = useState('1');
-  const [delTouched, setDelTouched] = useState(false);
   const [notes, setNotes] = useState('');
   const [mode, setMode] = useState<DuplicateMode>('somar');
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +66,6 @@ export function AddItemModal({ pending, existing, rules, onCancel, onConfirm }: 
     if (pending) {
       setReq('1');
       setDel('1');
-      setDelTouched(false);
       setNotes('');
       setMode('somar');
       setError(null);
@@ -144,7 +142,7 @@ export function AddItemModal({ pending, existing, rules, onCancel, onConfirm }: 
                   value={req}
                   onChange={(v) => {
                     setReq(v);
-                    if (!delTouched) setDel(v);
+                    setDel(v);
                     setError(null);
                   }}
                 />
@@ -154,7 +152,6 @@ export function AddItemModal({ pending, existing, rules, onCancel, onConfirm }: 
                   value={del}
                   onChange={(v) => {
                     setDel(v);
-                    setDelTouched(true);
                     setError(null);
                   }}
                 />

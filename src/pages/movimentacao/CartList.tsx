@@ -115,7 +115,7 @@ export function CartList({ cart, setCart, rules, readOnly }: Props) {
                     label={`Quantidade solicitada de ${item.material.name}`}
                     value={item.quantity_requested}
                     disabled={readOnly}
-                    onCommit={(n) => commit(item.key, { quantity_requested: n })}
+                    onCommit={(n) => commit(item.key, { quantity_requested: n, quantity_delivered: n })}
                   />
                 </label>
                 <label className="text-xs font-medium text-slate-600">
